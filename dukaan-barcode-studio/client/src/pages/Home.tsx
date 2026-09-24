@@ -179,8 +179,8 @@ function BarcodeMark({ value, compact = false }: { value: string; compact?: bool
       try {
         JsBarcode(svgRef.current, value, {
           format: "CODE128",
-          width: compact ? 1.25 : 1.45,
-          height: compact ? 28 : 42,
+          width: compact? 1.25 : 1.45,
+          height: compact? 28 : 42,
           displayValue: false,
           margin: 0,
           lineColor: "#101b2d",
@@ -192,7 +192,7 @@ function BarcodeMark({ value, compact = false }: { value: string; compact?: bool
     }
   }, [value, compact]);
 
-  return <svg ref={svgRef} className={compact ? "barcode-svg barcode-svg--compact" : "barcode-svg"} aria-label={`Barcode ${value}`} />;
+  return <svg ref={svgRef} className={compact? "barcode-svg barcode-svg--compact" : "barcode-svg"} aria-label={`Barcode ${value}`} />;
 }
 
 function Logo() {
@@ -243,83 +243,142 @@ export default function Home() {
   const uniqueCount = products.length;
 
   const updateProduct = (id: number, field: keyof Product, value: string | number) => {
-    setProducts((current) => current.map((product) => product.id === id ? { ...product, [field]: value } : product));
+    setProducts((current) => current.map((product) => product.id === id? {...product, [field]: value } : product));
   };
 
   const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const numberValue = (value: unknown) => Number(String(value ?? "").replace(/[^0-9.]/g, "")) || 0;
-  const firstField = (entries: Record<string, unknown>, aliases: string[]) => aliases.map(normalizeHeader).map((alias) => entries[alias]).find((value) => value !== undefined && value !== "");
+  const numberValue = (value: unknown) => Number(String(value?? "").replace(/[^0-9.\-]/g, "")) || 0;
 
+  // ---- UNIVERSAL PARSER - HANDLES BOTH YOUR EXCELS ----
   const parseWorkbook = (file: File) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const workbook = XLSX.read(event.target?.result, { type: "array" });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(firstSheet, { defval: "" });
-        const detectedFields = new Set<string>();
-        const mapped = rawRows.map((row, index) => {
-          const entries = Object.entries(row).reduce<Record<string, unknown>>((acc, [key, value]) => {
-            acc[normalizeHeader(key)] = value;
-            return acc;
-          }, {});
-          const name = firstField(entries, ["name", "product", "product name", "productname", "item", "item name", "description"]) ?? "";
-          const code = firstField(entries, ["code", "barcode", "item code", "itemcode", "sku", "ean", "upc"]) ?? "";
-          const price = firstField(entries, ["price", "selling price", "sellingprice", "rate", "unit price", "unitprice", "mrp"]) ?? 0;
-          const mrp = firstField(entries, ["mrp", "max retail price", "retail price"]);
-          const qty = firstField(entries, ["qty", "quantity", "count", "pieces", "pcs"]);
-          const unit = firstField(entries, ["unit", "uom", "measure"]);
-          const plu = firstField(entries, ["plu", "plu no", "plu number", "pluno"]);
-          const weight = firstField(entries, ["weight", "net weight", "netweight", "wt"]);
-          const unitPrice = firstField(entries, ["unit price", "unitprice", "rate", "price per kg", "priceperkg"]);
-          const totalPrice = firstField(entries, ["total price", "totalprice", "amount", "value"]);
-          const packedDate = firstField(entries, ["packed date", "packeddate", "packing date", "mfg date"]);
-          const useByDate = firstField(entries, ["use by date", "usebydate", "expiry", "expiry date", "best before"]);
-          const labelTemplate = firstField(entries, ["label", "label no", "label number", "template", "template no", "design", "label type"]) ?? (labelMode === "pc" ? "1" : "2");
-          const mappedAliases = ["name", "product", "product name", "productname", "item", "item name", "description", "code", "barcode", "item code", "itemcode", "sku", "ean", "upc", "price", "selling price", "sellingprice", "rate", "unit price", "unitprice", "mrp", "max retail price", "retail price", "qty", "quantity", "count", "pieces", "pcs", "unit", "uom", "measure", "plu", "plu no", "plu number", "pluno", "weight", "net weight", "netweight", "wt", "price per kg", "priceperkg", "total price", "totalprice", "amount", "value", "packed date", "packeddate", "packing date", "mfg date", "use by date", "usebydate", "expiry", "expiry date", "best before", "label", "label no", "label number", "template", "template no", "design", "label type"].map(normalizeHeader);
-          const extraFields = Object.entries(row).filter(([key, value]) => !mappedAliases.includes(normalizeHeader(key)) && value !== "").map(([label, value]) => ({ label, value: String(value) })).filter((field) => field.value.trim());
-          if (name) detectedFields.add("Name");
-          if (code) detectedFields.add("Code");
-          if (price) detectedFields.add("Price");
-          if (mrp) detectedFields.add("MRP");
-          if (qty) detectedFields.add("Qty");
-          if (unit) detectedFields.add("Unit");
-          if (plu) detectedFields.add("PLU");
-          if (weight) detectedFields.add("Weight");
-          if (packedDate) detectedFields.add("Packed date");
-          if (useByDate) detectedFields.add("Use by date");
-          if (labelTemplate) detectedFields.add("Label");
-          return {
-            id: Date.now() + index,
-            name: String(name).trim(),
-            code: String(code).trim(),
-            price: numberValue(price),
-            mrp: numberValue(mrp || price),
-            qty: numberValue(qty) || 1,
-            unit: String(unit || "pc").trim(),
-            plu: String(plu || "").trim(),
-            unitPrice: numberValue(unitPrice || price),
-            weight: numberValue(weight),
-            totalPrice: numberValue(totalPrice || price),
-            packedDate: String(packedDate || "").trim(),
-            useByDate: String(useByDate || "").trim(),
-            labelTemplate: String(labelTemplate).trim(),
-            extraFields,
-            copies: 1,
-          };
-        }).filter((item) => item.name || item.code);
 
-        if (!mapped.length) {
-          toast.error("We couldn't find product rows. Use Name, Price, and Code columns.");
+        // Read as array of arrays to keep first row as header
+        const rawData = XLSX.utils.sheet_to_json<any[]>(firstSheet, { header: 1, defval: "" }) as any[][];
+        if (!rawData.length) {
+          toast.error("Excel is empty");
           return;
         }
+
+        // Auto-detect header row - works for plu no / pluname / ITEM NAME / QTY etc
+        let headerRowIndex = 0;
+        for (let i = 0; i < Math.min(5, rawData.length); i++) {
+          const joined = rawData[i].join(" ").toLowerCase();
+          if (joined.includes("name") || joined.includes("plu") || joined.includes("barcode") || joined.includes("item") || joined.includes("qty") || joined.includes("code")) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        const originalHeaders = rawData[headerRowIndex].map((h: any) => String(h).trim()).filter((h: string) => h!== "");
+        const dataRows = rawData.slice(headerRowIndex + 1).filter((r) => r.some((c) => String(c).trim()!== ""));
+
+        // Build normalized rows
+        const normalizedRows = dataRows.map((r) => {
+          const obj: Record<string, unknown> = {};
+          originalHeaders.forEach((orig) => {
+            const realIdx = rawData[headerRowIndex].findIndex((h) => String(h).trim() === orig);
+            const normKey = normalizeHeader(orig);
+            obj[normKey] = r[realIdx];
+            obj[orig.toLowerCase()] = r[realIdx];
+          });
+          return obj;
+        });
+
+        const FIELD_MAP: Record<string, string[]> = {
+          name: ["itemname", "pluname", "productname", "name", "description", "particular", "item", "product", "title"],
+          code: ["barcode", "plucode", "productcode", "itemcode", "sku", "ean", "code"],
+          qty: ["qty", "quantity", "count", "pieces", "pcs"],
+          price: ["unitprice", "unit price", "price", "mrp", "rate", "sellingprice", "amount"],
+          plu: ["pluno", "plu no", "plu number", "plu"],
+          uom: ["uom", "unit", "measure", "uomname"],
+          label: ["labellinkno", "labelno", "label", "template", "labellink"],
+          prodDate: ["productiondate", "production date", "packeddate", "packed date", "mfgdate", "packingdate"],
+          expDate: ["expirydate", "expiry date", "usebydate", "use by date", "expdate", "bestbefore"],
+        };
+
+        const getByMap = (row: Record<string, unknown>, keys: string[]) => {
+          for (const k of keys) {
+            const nk = normalizeHeader(k);
+            if (row[nk]!== undefined && String(row[nk]).trim()!== "") return row[nk];
+            const found = Object.keys(row).find((rk) => rk.includes(nk) || nk.includes(rk));
+            if (found && String(row[found]).trim()!== "") return row[found];
+          }
+          return undefined;
+        };
+
+        const detectedFields = new Set<string>(originalHeaders);
+
+        const mapped = normalizedRows
+         .map((entries, index) => {
+            const name = getByMap(entries, FIELD_MAP.name)?? "";
+            const code = getByMap(entries, FIELD_MAP.code)?? "";
+            const price = getByMap(entries, FIELD_MAP.price)?? 0;
+            const mrp = getByMap(entries, ["mrp", "max retail price"])?? price;
+            const qty = getByMap(entries, FIELD_MAP.qty)?? 1;
+            const unit = getByMap(entries, FIELD_MAP.uom)?? "pc";
+            const plu = getByMap(entries, FIELD_MAP.plu)?? "";
+            const unitPrice = getByMap(entries, FIELD_MAP.price)?? price;
+            const packedDate = getByMap(entries, FIELD_MAP.prodDate)?? "";
+            const useByDate = getByMap(entries, FIELD_MAP.expDate)?? "";
+            const labelTemplate = getByMap(entries, FIELD_MAP.label)?? (labelMode === "pc"? "1" : "2");
+
+            let finalName = String(name).trim();
+            if (!finalName) {
+              const firstText = Object.values(entries).find((v) => {
+                const s = String(v).trim();
+                return s.length > 2 && isNaN(Number(s));
+              });
+              if (firstText) finalName = String(firstText).trim();
+            }
+
+            let finalCode = String(code).trim();
+            if (!finalCode) finalCode = String(plu).trim() || `CODE${index + 1}`;
+
+            const qtyNum = numberValue(qty) || 1;
+
+            const mappedAliases = Object.values(FIELD_MAP).flat().map(normalizeHeader);
+            const extraFields = Object.entries(entries)
+             .filter(([k, v]) =>!mappedAliases.some((m) => k.includes(m)) && String(v).trim()!== "" &&!k.includes(" "))
+             .slice(0, 3)
+             .map(([label, value]) => ({ label, value: String(value) }));
+
+            return {
+              id: Date.now() + index,
+              name: finalName || `Product ${index + 1}`,
+              code: finalCode,
+              price: numberValue(price),
+              mrp: numberValue(mrp || price),
+              qty: qtyNum,
+              unit: String(unit || "pc").trim(),
+              plu: String(plu || "").trim(),
+              unitPrice: numberValue(unitPrice || price),
+              weight: 0,
+              totalPrice: numberValue(price),
+              packedDate: String(packedDate || "").trim(),
+              useByDate: String(useByDate || "").trim(),
+              labelTemplate: String(labelTemplate).trim(),
+              extraFields,
+              copies: Math.max(1, Math.min(20, Math.floor(qtyNum) || 1)),
+            };
+          })
+         .filter((item) => item.name && item.code);
+
+        if (!mapped.length) {
+          toast.error(`We couldn't find product rows. Headers: ${originalHeaders.join(", ")}`);
+          return;
+        }
+
         setProducts(mapped);
         setMappedFields(Array.from(detectedFields));
-        const missing = [mapped.some((item) => !item.name) ? "Name" : "", mapped.some((item) => !item.code) ? "Code" : "", mapped.some((item) => !item.price) ? "Price" : ""].filter(Boolean);
-        if (missing.length) toast.warning(`Imported with missing fields: ${missing.join(", ")}`);
         toast.success(`${mapped.length} products imported from ${file.name}`);
         setActiveSection("studio");
-      } catch {
+      } catch (e) {
+        console.error(e);
         toast.error("That file could not be read. Please upload a CSV or Excel file.");
       }
     };
@@ -346,7 +405,7 @@ export default function Home() {
       toast.error("Add at least one product before exporting.");
       return;
     }
-    const rows = [["PLU No", "Barcode", "Name", "Price"], ...products.map((product, index) => [product.plu || String(index + 1).padStart(4, "0"), product.code, `"${product.name.replaceAll('"', '""')}"`, product.price.toFixed(2)])];
+    const rows = [["PLU No", "Barcode", "Name", "Price"],...products.map((product, index) => [product.plu || String(index + 1).padStart(4, "0"), product.code, `"${product.name.replaceAll('"', '""')}"`, product.price.toFixed(2)])];
     downloadBlob(rows.map((row) => row.join(",")).join("\n"), "dukaan-essae-plu.csv", "text/csv;charset=utf-8");
     toast.success("Essae PLU CSV exported");
   };
@@ -372,7 +431,7 @@ export default function Home() {
       const labels = products.flatMap((product) => Array.from({ length: product.copies }, () => product));
 
       labels.forEach((product, index) => {
-        const isWeightLabel = product.labelTemplate === "2" || (product.labelTemplate !== "1" && labelMode === "weight");
+        const isWeightLabel = product.labelTemplate === "2" || (product.labelTemplate!== "1" && labelMode === "weight");
         const pageIndex = Math.floor(index / perPage);
         const pagePosition = index % perPage;
         if (index > 0 && pagePosition === 0) pdf.addPage();
@@ -387,15 +446,15 @@ export default function Home() {
         pdf.setFont("helvetica", "bold");
         pdf.setFontSize(6);
         pdf.setTextColor(111, 127, 146);
-        pdf.text(isWeightLabel ? "WEIGHT LABEL" : (mrp ? "MRP STICKER" : "PC LABEL"), x + 4, y + 5);
+        pdf.text(isWeightLabel? "WEIGHT LABEL" : (mrp? "MRP STICKER" : "PC LABEL"), x + 4, y + 5);
         pdf.setTextColor(230, 94, 71);
         pdf.text("CODE-128", x + labelWidth - 4, y + 5, { align: "right" });
         pdf.setTextColor(16, 27, 45);
         pdf.setFontSize(9);
-        const safeName = product.name.length > 24 ? `${product.name.slice(0, 23)}…` : product.name;
+        const safeName = product.name.length > 24? `${product.name.slice(0, 23)}…` : product.name;
         pdf.text(safeName, x + 4, y + 12);
         pdf.setFontSize(13);
-        pdf.text(formatPrice(isWeightLabel ? (product.totalPrice || product.price) : (product.mrp || product.price)), x + 4, y + 19);
+        pdf.text(formatPrice(isWeightLabel? (product.totalPrice || product.price) : (product.mrp || product.price)), x + 4, y + 19);
 
         const canvas = document.createElement("canvas");
         JsBarcode(canvas, product.code || "0", { format: "CODE128", width: 2, height: 35, displayValue: false, margin: 0, lineColor: "#101b2d", background: "#ffffff" });
@@ -412,22 +471,22 @@ export default function Home() {
           `Qty: ${product.qty || "—"}`,
           `Unit: ${product.unit || "—"}`,
           `MRP: ${formatPrice(product.mrp || product.price)}`,
-          product.plu ? `PLU: ${product.plu}` : "",
-          product.totalPrice ? `Total: ${formatPrice(product.totalPrice)}` : "",
+          product.plu? `PLU: ${product.plu}` : "",
+          product.totalPrice? `Total: ${formatPrice(product.totalPrice)}` : "",
           product.extraFields?.map((field) => `${field.label}: ${field.value}`).join(" | ") || "",
-        ].filter(Boolean).join("  •  ");
+        ].filter(Boolean).join(" • ");
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(4.5);
         pdf.setTextColor(82, 97, 118);
-        pdf.text(product.code, x + labelWidth / 2, y + (isWeightLabel ? 34 : 33), { align: "center" });
+        pdf.text(product.code, x + labelWidth / 2, y + (isWeightLabel? 34 : 33), { align: "center" });
         const fieldLines = pdf.splitTextToSize(coreFields, labelWidth - 8);
         pdf.text(fieldLines, x + 4, y + 39, { maxWidth: labelWidth - 8, lineHeightFactor: 1.25 });
         void pageIndex;
       });
 
-      const filename = labelMode === "weight" ? "dukaan-weight-labels.pdf" : (mrp ? "dukaan-mrp-stickers.pdf" : "dukaan-pc-labels.pdf");
+      const filename = labelMode === "weight"? "dukaan-weight-labels.pdf" : (mrp? "dukaan-mrp-stickers.pdf" : "dukaan-pc-labels.pdf");
       pdf.save(filename);
-      toast.success(`${labelMode === "weight" ? "Weight" : (mrp ? "MRP" : "PC")} label PDF downloaded`);
+      toast.success(`${labelMode === "weight"? "Weight" : (mrp? "MRP" : "PC")} label PDF downloaded`);
     } catch {
       toast.error("PDF generation failed. Try again or use print preview.");
     }
@@ -439,35 +498,35 @@ export default function Home() {
       return;
     }
     const labelMarkup = products.flatMap((product) => Array.from({ length: product.copies }, () => `
-      <article class="print-label ${mrp ? "print-label--mrp" : ""}">
-        <div class="print-label__top"><span>DUKAAN</span><strong>${mrp ? "MRP" : "BARCODE"}</strong></div>
+      <article class="print-label ${mrp? "print-label--mrp" : ""}">
+        <div class="print-label__top"><span>DUKAAN</span><strong>${mrp? "MRP" : "BARCODE"}</strong><span>QTY:${product.qty}</span></div>
         <div class="print-label__name">${product.name.replace(/[<>&]/g, "")}</div>
         <div class="print-label__price">₹${product.price.toLocaleString("en-IN")}</div>
         <svg class="print-barcode" data-value="${product.code.replace(/[^0-9A-Za-z]/g, "")}"></svg>
-        <div class="print-label__code">${product.code}</div>
+        <div class="print-label__code">${product.code} | ${product.packedDate || ""} → ${product.useByDate || ""}</div>
       </article>`)).join("");
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
       toast.error("Allow pop-ups to open the print preview.");
       return;
     }
-    printWindow.document.write(`<!doctype html><html><head><title>${mrp ? "MRP Stickers" : "Barcode Sheet"} — Dukaan</title><style>
+    printWindow.document.write(`<!doctype html><html><head><title>${mrp? "MRP Stickers" : "Barcode Sheet"} — Dukaan</title><style>
       @page { size: A4; margin: 12mm; }
       * { box-sizing: border-box; } body { margin: 0; font-family: Arial, sans-serif; color: #101b2d; background: white; }
-      .sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8mm 6mm; align-items: start; }
-      .print-label { border: 1px solid #d9dde4; border-radius: 6px; padding: 5mm 4mm 4mm; min-height: 42mm; break-inside: avoid; background: white; }
-      .print-label--mrp { border-color: #b8c4d4; }
-      .print-label__top { display: flex; justify-content: space-between; align-items: center; color: #708097; font-size: 7px; letter-spacing: .14em; font-weight: 700; }
-      .print-label__top strong { color: #e65e47; font-size: 7px; }
-      .print-label__name { font-size: 12px; font-weight: 700; margin-top: 4mm; min-height: 9mm; line-height: 1.15; }
-      .print-label__price { font-size: 19px; font-weight: 800; margin-top: 2mm; }
-      .print-barcode { width: 100%; height: 12mm; margin-top: 3mm; }
-      .print-label__code { text-align: center; font-size: 8px; letter-spacing: .14em; margin-top: 1mm; color: #526176; }
-      .print-hint { color: #708097; text-align: center; font-size: 11px; margin: 0 0 8mm; }
-      @media print { .print-hint { display: none; } }
-    </style></head><body><p class="print-hint">${mrp ? "MRP sticker sheet" : "Code-128 barcode sheet"} · ${labelCount} labels · Save as PDF or print on A4</p><main class="sheet">${labelMarkup}</main><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script><script>window.onload=function(){document.querySelectorAll('.print-barcode').forEach(function(svg){JsBarcode(svg,svg.dataset.value,{format:'CODE128',width:1.3,height:44,displayValue:false,margin:0,lineColor:'#101b2d',background:'transparent'});});setTimeout(function(){window.print();},350);};<\/script></body></html>`);
+     .sheet { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8mm 6mm; align-items: start; }
+     .print-label { border: 1px solid #d9dde4; border-radius: 6px; padding: 5mm 4mm 4mm; min-height: 42mm; break-inside: avoid; background: white; }
+     .print-label--mrp { border-color: #b8c4d4; }
+     .print-label__top { display: flex; justify-content: space-between; align-items: center; color: #708097; font-size: 7px; letter-spacing:.14em; font-weight: 700; }
+     .print-label__top strong { color: #e65e47; font-size: 7px; }
+     .print-label__name { font-size: 12px; font-weight: 700; margin-top: 4mm; min-height: 9mm; line-height: 1.15; }
+     .print-label__price { font-size: 19px; font-weight: 800; margin-top: 2mm; }
+     .print-barcode { width: 100%; height: 12mm; margin-top: 3mm; }
+     .print-label__code { text-align: center; font-size: 8px; letter-spacing:.14em; margin-top: 1mm; color: #526176; }
+     .print-hint { color: #708097; text-align: center; font-size: 11px; margin: 0 0 8mm; }
+      @media print {.print-hint { display: none; } }
+    </style></head><body><p class="print-hint">${mrp? "MRP sticker sheet" : "Code-128 barcode sheet"} · ${labelCount} labels · Save as PDF or print on A4</p><main class="sheet">${labelMarkup}</main><script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script><script>window.onload=function(){document.querySelectorAll('.print-barcode').forEach(function(svg){JsBarcode(svg,svg.dataset.value,{format:'CODE128',width:1.3,height:44,displayValue:false,margin:0,lineColor:'#101b2d',background:'transparent'});});setTimeout(function(){window.print();},350);};<\/script></body></html>`);
     printWindow.document.close();
-    toast.success(`${mrp ? "MRP sticker" : "Barcode"} print preview opened`);
+    toast.success(`${mrp? "MRP sticker" : "Barcode"} print preview opened`);
   };
 
   const scrollTo = (id: string) => {
@@ -475,20 +534,19 @@ export default function Home() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-
   return (
     <div className="site-shell">
       <header className="topbar">
         <div className="topbar-inner">
           <a className="brand-link" href="#top" aria-label="Dukaan Barcode Studio home"><Logo /></a>
           <nav className="main-nav" aria-label="Main navigation">
-            <button className={activeSection === "studio" ? "nav-link nav-link--active" : "nav-link"} onClick={() => scrollTo("studio")}>{t.navStudio}</button>
-            <button className={activeSection === "labels" ? "nav-link nav-link--active" : "nav-link"} onClick={() => scrollTo("labels")}>My Labels</button>
-            <button className={activeSection === "guide" ? "nav-link nav-link--active" : "nav-link"} onClick={() => scrollTo("guide")}>{t.navGuide}</button>
+            <button className={activeSection === "studio"? "nav-link nav-link--active" : "nav-link"} onClick={() => scrollTo("studio")}>{t.navStudio}</button>
+            <button className={activeSection === "labels"? "nav-link nav-link--active" : "nav-link"} onClick={() => scrollTo("labels")}>My Labels</button>
+            <button className={activeSection === "guide"? "nav-link nav-link--active" : "nav-link"} onClick={() => scrollTo("guide")}>{t.navGuide}</button>
           </nav>
           <div className="topbar-actions">
-            <button className="language-toggle" onClick={() => setLanguage(language === "en" ? "hi" : "en")} aria-label="Switch language">
-              <Languages size={16} /> <span>{language === "en" ? "हिंदी" : "English"}</span> <ChevronDown size={14} />
+            <button className="language-toggle" onClick={() => setLanguage(language === "en"? "hi" : "en")} aria-label="Switch language">
+              <Languages size={16} /> <span>{language === "en"? "हिंदी" : "English"}</span> <ChevronDown size={14} />
             </button>
             <Button className="button button--dark button--small" onClick={() => scrollTo("studio")}>{t.launch}<ArrowRight size={15} /></Button>
           </div>
@@ -522,25 +580,25 @@ export default function Home() {
         <section id="studio" className="studio-section anchor-section">
           <div className="studio-header">
             <div><SectionKicker tone="coral">{t.navStudio}</SectionKicker><h2>{t.uploadTitle}</h2><p>{t.uploadBody}</p></div>
-            <div className="format-badges"><Badge variant="outline"><FileSpreadsheet size={14} /> .XLSX</Badge><Badge variant="outline"><FileText size={14} /> .CSV</Badge></div>
+            <div className="format-badges"><Badge variant="outline"><FileSpreadsheet size={14} />.XLSX</Badge><Badge variant="outline"><FileText size={14} />.CSV</Badge></div>
           </div>
-          <div className={`upload-zone ${isDragging ? "upload-zone--active" : ""}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); handleFile(event.dataTransfer.files[0]); }}>
+          <div className={`upload-zone ${isDragging? "upload-zone--active" : ""}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); handleFile(event.dataTransfer.files[0]); }}>
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleFileInput} className="sr-only" />
             <div className="upload-icon"><CloudUpload size={27} /></div>
-            <div className="upload-copy"><strong>{isDragging ? "Drop it here" : "Drag & drop your file here"}</strong><span>We map common columns automatically and keep custom fields for label printing.</span></div>
+            <div className="upload-copy"><strong>{isDragging? "Drop it here" : "Drag & drop your file here"}</strong><span>We map common columns automatically and keep custom fields for label printing.</span></div>
             <div className="upload-actions"><Button className="button button--dark" onClick={() => fileRef.current?.click()}><Upload size={16} />{t.browse}</Button><span className="free-usage-note">Free · Unlimited labels</span></div>
           </div>
 
           <div className="label-config-row">
-            <div className="label-config-copy"><span className="config-label">{t.labelType}</span><strong>{labelMode === "pc" ? t.pcLabel : t.weightLabel}</strong><small>{labelMode === "pc" ? "For piece-count products: name, MRP, barcode and quantity." : "Essae-style layout: unit price, weight, total price, packed date and use-by date."}</small></div>
-            <div className="label-mode-toggle" role="group" aria-label={t.labelType}><button className={labelMode === "pc" ? "label-mode-button label-mode-button--active" : "label-mode-button"} onClick={() => setLabelMode("pc")}><Barcode size={16} />{t.pcLabel}</button><button className={labelMode === "weight" ? "label-mode-button label-mode-button--active" : "label-mode-button"} onClick={() => setLabelMode("weight")}><Scale size={16} />{t.weightLabel}</button></div>
+            <div className="label-config-copy"><span className="config-label">{t.labelType}</span><strong>{labelMode === "pc"? t.pcLabel : t.weightLabel}</strong><small>{labelMode === "pc"? "For piece-count products: name, MRP, barcode and quantity." : "Essae-style layout: unit price, weight, total price, packed date and use-by date."}</small></div>
+            <div className="label-mode-toggle" role="group" aria-label={t.labelType}><button className={labelMode === "pc"? "label-mode-button label-mode-button--active" : "label-mode-button"} onClick={() => setLabelMode("pc")}><Barcode size={16} />{t.pcLabel}</button><button className={labelMode === "weight"? "label-mode-button label-mode-button--active" : "label-mode-button"} onClick={() => setLabelMode("weight")}><Scale size={16} />{t.weightLabel}</button></div>
             <div className="mapped-fields"><span>{t.mappedFields}</span>{mappedFields.slice(0, 8).map((field) => <Badge key={field} variant="outline">{field}</Badge>)}</div>
           </div>
 
           <div className="workspace-card">
             <div className="workspace-topline"><div className="workspace-title"><div className="workspace-icon"><LayoutGrid size={16} /></div><div><h3>{t.preview}</h3><p><span className="status-dot" />{uniqueCount} {t.rowsReady} · {labelCount} {t.labels.toLowerCase()}</p></div></div><div className="workspace-menu"><Badge className="badge-soft"><Sparkles size={13} /> Code-128</Badge><button className="icon-button" aria-label="More options"><MoreHorizontal size={20} /></button></div></div>
             <Separator />
-            {products.length ? <div className="product-table-wrap"><table className="product-table"><thead><tr><th>{t.product}</th><th>{t.barcode}</th><th>{t.price}</th><th>{t.labels}</th><th><span className="sr-only">{t.action}</span></th></tr></thead><tbody>{products.map((product, index) => <tr key={product.id}><td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" aria-label={`${t.product} name`} /><span className="subtle-label">Label {product.labelTemplate || "1"} · {product.unit || "pc"}</span></div></div></td><td><div className="barcode-cell"><BarcodeMark value={product.code} compact /><Input value={product.code} onChange={(event) => updateProduct(product.id, "code", event.target.value)} className="table-input table-input--code" aria-label={`${t.barcode} value`} /></div></td><td><div className="price-input-wrap"><IndianRupee size={14} /><Input type="number" value={product.price} onChange={(event) => updateProduct(product.id, "price", Number(event.target.value))} className="table-input table-input--price" aria-label={`${t.price} value`} /></div></td><td><div className="copy-stepper"><button onClick={() => updateProduct(product.id, "copies", Math.max(1, product.copies - 1))} aria-label="Remove label"><Minus size={14} /></button><span>{product.copies}</span><button onClick={() => updateProduct(product.id, "copies", Math.min(20, product.copies + 1))} aria-label="Add label"><Plus size={14} /></button></div></td><td><button className="delete-button" onClick={() => { setProducts((current) => current.filter((item) => item.id !== product.id)); toast.success("Product removed"); }} aria-label={`Remove ${product.name}`}><X size={16} /></button></td></tr>)}</tbody></table></div> : <div className="empty-state"><div className="empty-state__icon"><Barcode size={26} /></div><h3>{t.emptyTitle}</h3><p>{t.emptyBody}</p></div>}
+            {products.length? <div className="product-table-wrap"><table className="product-table"><thead><tr><th>QTY</th><th>{t.product}</th><th>{t.barcode}</th><th>{t.price}</th><th>{t.labels}</th><th><span className="sr-only">{t.action}</span></th></tr></thead><tbody>{products.map((product, index) => <tr key={product.id}><td><Badge variant="outline">{product.qty}</Badge></td><td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" aria-label={`${t.product} name`} /><span className="subtle-label">Label {product.labelTemplate || "1"} · {product.unit || "pc"} · PLU {product.plu || "-"} · {product.packedDate || ""}→{product.useByDate || ""}</span></div></div></td><td><div className="barcode-cell"><BarcodeMark value={product.code} compact /><Input value={product.code} onChange={(event) => updateProduct(product.id, "code", event.target.value)} className="table-input table-input--code" aria-label={`${t.barcode} value`} /></div></td><td><div className="price-input-wrap"><IndianRupee size={14} /><Input type="number" value={product.price} onChange={(event) => updateProduct(product.id, "price", Number(event.target.value))} className="table-input table-input--price" aria-label={`${t.price} value`} /></div></td><td><div className="copy-stepper"><button onClick={() => updateProduct(product.id, "copies", Math.max(1, product.copies - 1))} aria-label="Remove label"><Minus size={14} /></button><span>{product.copies}</span><button onClick={() => updateProduct(product.id, "copies", Math.min(20, product.copies + 1))} aria-label="Add label"><Plus size={14} /></button></div></td><td><button className="delete-button" onClick={() => { setProducts((current) => current.filter((item) => item.id!== product.id)); toast.success("Product removed"); }} aria-label={`Remove ${product.name}`}><X size={16} /></button></td></tr>)}</tbody></table></div> : <div className="empty-state"><div className="empty-state__icon"><Barcode size={26} /></div><h3>{t.emptyTitle}</h3><p>{t.emptyBody}</p></div>}
             <div className="workspace-footer"><div className="footer-stats"><div><span className="stat-number">{uniqueCount}</span><span className="stat-label">{t.products}</span></div><div><span className="stat-number">{labelCount}</span><span className="stat-label">{t.labels}</span></div><div><span className="stat-number">A4</span><span className="stat-label">print size</span></div></div><div className="workspace-actions"><Button className="button button--outline" onClick={() => generatePDF(false)} disabled={!products.length}><Printer size={16} />{t.generate}</Button><Button className="button button--outline button--coral" onClick={exportPLU} disabled={!products.length}><Download size={16} />{t.export}</Button><Button className="button button--dark" onClick={() => generatePDF(true)} disabled={!products.length}><BadgeIndianRupee size={16} />{t.sticker}</Button></div></div>
           </div>
           <div className="studio-caption"><ShieldCheck size={15} /><span>Your files stay in your browser. Nothing is uploaded to a server.</span></div>
