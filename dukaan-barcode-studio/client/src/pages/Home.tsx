@@ -807,28 +807,34 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-2 flex gap-2 border shadow-sm mb-3">
+         // ✅ YE PASTE KARO - NAYA FIX
+          <div className="bg-white rounded-xl p-2 flex gap-2 border shadow-sm mb-3 flex-wrap items-center">
             <Button
               onClick={() => {
                 setActiveTab("store");
                 setProducts(storeProducts);
               }}
-              className={activeTab === "store"? "bg-black text-white" : "bg-gray-100 text-black"}
+              className={activeTab === "store"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"}
+              title="STORE CSV: plu no,pluname,plucode,uom,unitprice,labellinkno,usebydate"
             >
-              <Store size={16} /> STORE ({storeProducts.length}) - plu no,pluname,plucode,uom,unitprice,labellinkno,usebydate
+              <Store size={14} /> STORE ({storeProducts.length})
             </Button>
             <Button
               onClick={() => {
                 setActiveTab("production");
                 setProducts(prodProducts);
               }}
-              className={activeTab === "production"? "bg-black text-white" : "bg-gray-100 text-black"}
+              className={activeTab === "production"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"}
+              title="PRODUCTION XLSX: QTY, ITEM NAME, BARCODE, Production Date, Expiry Date"
             >
-              <Factory size={16} /> PRODUCTION ({prodProducts.length}) - QTY, ITEM NAME, BARCODE, Production Date, Expiry Date
+              <Factory size={14} /> PRODUCTION ({prodProducts.length})
             </Button>
-            <div className="ml-auto flex gap-2 items-center">
-              <Badge variant="outline">54x37 Thermal - No Cut</Badge>
-              <Badge className={activeTab === "store"? "bg-green-600" : "bg-orange-600"}>{activeTab.toUpperCase()}</Badge>
+            <div className="ml-auto flex gap-2 items-center flex-wrap">
+              <Badge variant="outline" className="text-[10px]">54x37 Thermal - No Cut</Badge>
+              <Badge className={activeTab === "store"? "bg-green-600 text-[10px]" : "bg-orange-600 text-[10px]"}>{activeTab.toUpperCase()}</Badge>
+            </div>
+            <div className="w-full text-[9px] text-gray-400 mt-1 hidden md:block">
+              {activeTab === "store"? "STORE fields: plu no, pluname, plucode, uom (0=PC/1=GRM), unitprice, labellinkno, usebydate (days)" : "PRODUCTION fields: QTY, ITEM NAME, BARCODE, Production Date, Expiry Date"}
             </div>
           </div>
 
