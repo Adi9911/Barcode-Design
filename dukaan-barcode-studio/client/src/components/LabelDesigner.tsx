@@ -184,7 +184,8 @@ export default function LabelDesigner({ products }: { products: DesignerProduct[
   const displayScale = useMemo(() => Math.min(1, 520 / Math.max(1, toMm(template.width, template.unit))), [template]);
   if (!template) return null;
 
-  return <section className="designer-section anchor-section" id="labels">
+  return (
+  <section className="designer-section anchor-section" id="labels">
     <div className="designer-heading"><div><div className="section-kicker section-kicker--coral"><span className="kicker-dot" />MY LABELS</div><h2>Design once. Print whenever you need.</h2><p>Dynamic Field Creator: Choose Field Type, Data Source (Excel columns) and Display Format.</p></div><div className="designer-actions"><Button className="button button--dark button--small" onClick={()=>{const next={...blankTemplate(), id:makeId()}; mutateTemplates([...templates,next]); setSelectedId(next.id);}}><Plus size={15} />Create label</Button></div></div>
     <div className="designer-layout">
       <aside className="template-library"><div className="panel-title"><span>MY LABELS</span><Badge variant="outline">{templates.length}</Badge></div><div className="template-list">{templates.map((item) => <button key={item.id} className={item.id === template.id? "template-item template-item--active" : "template-item"} onClick={() => { setSelectedId(item.id); setSelectedElementId(null); }}><span className="template-item__copy"><strong>{item.name}</strong><small>{item.width} × {item.height} {item.unit}</small></span></button>)}</div></aside>
@@ -216,7 +217,6 @@ export default function LabelDesigner({ products }: { products: DesignerProduct[
         <div className="inspector-footer"><Button className="button button--dark button--full" onClick={printTemplate} disabled={!products.length}><Printer size={15} />Print selected label</Button><span><FileJson size={13} />Saved locally</span></div>
       </aside>
     </div>
-     </section>
+  </section>
   );
 }
-
