@@ -364,6 +364,31 @@ export default function Home() {
            .filter((item) => item.name && item.code);
           setStoreProducts(mapped);
           if (activeTab === "store") setProducts(mapped);
+                    // AUTO TEMPLATE BANANA - STORE
+          try {
+            const key = "dukaan-label-templates-v1";
+            const existing = JSON.parse(localStorage.getItem(key) || "[]");
+            const newTemplate = {
+              id: "auto-store-" + Date.now(),
+              name: `STORE Auto ${mapped.length} items`,
+              width: 54, height: 37,
+              elements: [
+                { id: "e1", type: "text", x: 2, y: 2, width: 50, height: 5, field: "name", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
+                { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 12, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
+                { id: "e3", type: "text", x: 2, y: 21, width: 50, height: 3, field: "code", dataSource: "code", fontSize: 5, bold: false, color: "#000", align: "center", text: "" },
+                { id: "e4", type: "text", x: 2, y: 25, width: 16, height: 3, field: "packeddate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Packed: {{value}}" },
+                { id: "e5", type: "text", x: 19, y: 25, width: 16, height: 3, field: "uom", dataSource: "uom", fontSize: 6, bold: true, color: "#000", align: "center", text: "", displayFormat: "UOM: {{value}}" },
+                { id: "e6", type: "text", x: 36, y: 25, width: 16, height: 3, field: "usebydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
+                { id: "e7", type: "text", x: 2, y: 29, width: 15, height: 3, field: "plu", dataSource: "plu", fontSize: 6, bold: true, color: "#000", align: "left", text: "", displayFormat: "Link: {{value}}" },
+                { id: "e8", type: "text", x: 19, y: 29, width: 16, height: 3, field: "expiry", dataSource: "expiry", fontSize: 6, bold: true, color: "#000", align: "center", text: "" },
+                { id: "e9", type: "text", x: 36, y: 29, width: 16, height: 6, field: "unitprice", dataSource: "unitprice", fontSize: 9, bold: true, color: "#000", align: "right", text: "", displayFormat: "CDF {{value}}" },
+              ]
+            };
+            const filtered = existing.filter((t:any)=>!t.id.startsWith("auto-"));
+            filtered.unshift(newTemplate);
+            localStorage.setItem(key, JSON.stringify(filtered));
+            window.dispatchEvent(new Event("templates-updated"));
+          } catch {}
           toast.success(`${mapped.length} STORE products imported`);
           setActiveSection("studio");
         } catch (err) {
@@ -449,6 +474,29 @@ export default function Home() {
          .filter((item) => item.name && item.code);
         setProdProducts(mapped);
         if (activeTab === "production") setProducts(mapped);
+                  // AUTO TEMPLATE BANANA - PRODUCTION - Price 0 nahi QTY ayega
+          try {
+            const key = "dukaan-label-templates-v1";
+            const existing = JSON.parse(localStorage.getItem(key) || "[]");
+            const newTemplate = {
+              id: "auto-prod-" + Date.now(),
+              name: `PRODUCTION Auto ${mapped.length} items`,
+              width: 54, height: 37,
+              elements: [
+                { id: "e1", type: "text", x: 2, y: 2, width: 50, height: 5, field: "itemname", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
+                { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 12, field: "barcode", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
+                { id: "e3", type: "text", x: 2, y: 21, width: 50, height: 3, field: "code", dataSource: "code", fontSize: 5, bold: false, color: "#000", align: "center", text: "" },
+                { id: "e4", type: "text", x: 2, y: 25, width: 16, height: 3, field: "productiondate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Prod: {{value}}" },
+                { id: "e5", type: "text", x: 19, y: 25, width: 16, height: 3, field: "qty", dataSource: "qty", fontSize: 7, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}}" },
+                { id: "e6", type: "text", x: 36, y: 25, width: 16, height: 3, field: "expirydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
+                { id: "e7", type: "text", x: 2, y: 29, width: 50, height: 6, field: "qty", dataSource: "qty", fontSize: 10, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}} PCS" },
+              ]
+            };
+            const filtered = existing.filter((t:any)=>!t.id.startsWith("auto-"));
+            filtered.unshift(newTemplate);
+            localStorage.setItem(key, JSON.stringify(filtered));
+            window.dispatchEvent(new Event("templates-updated"));
+          } catch {}
         toast.success(`${mapped.length} PRODUCTION products imported`);
         setActiveSection("studio");
       } catch {
