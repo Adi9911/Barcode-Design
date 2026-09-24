@@ -1,226 +1,232 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import JsBarcode from "jsbarcode";
-import QRCode from "qrcode";
-import { jsPDF } from "jspdf";
-import {
-  Barcode,
-  FileJson,
-  Grid3X3,
-  Layers,
-  Plus,
-  Printer,
-  RotateCw,
-  Save,
-  Trash2,
-  Undo2,
-  Redo2,
-} from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
-export type DesignerProduct = {
-  id: number;
-  name: string;
-  code: string;
-  price: number;
-  mrp?: number;
-  qty?: number;
-  unit?: string;
-  plu?: string;
-  unitPrice?: number;
-  weight?: number;
-  totalPrice?: number;
-  packedDate?: string;
-  useByDate?: string;
-  copies: number;
-  extraFields?: { label: string; value: string }[];
-};
-
-type ElementType = "text" | "dynamic" | "barcode" | "qrcode" | "price" | "number" | "date" | "time" | "formula" | "image" | "static" | "rectangle" | "line";
-type Unit = "mm" | "cm" | "in";
-
-export type LabelElement = {
+export interface LabelElement {
   id: string;
-  type: ElementType;
-  field?: string;
-  dataSource?: string;
-  displayFormat?: string;
-  formula?: string;
-  text?: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  type: "text" | "barcode" | "static";
+  x: number; y: number; width: number; height: number;
+  field: string;
+  dataSource: string;
   fontSize: number;
-  bold?: boolean;
-  color?: string;
-  align?: "left" | "center" | "right";
-  rotation?: number;
-};
+  bold: boolean;
+  color: string;
+  align: "left" | "center" | "right";
+  text: string;
+  displayFormat?: string;
+}
 
-export type LabelTemplate = {
+export interface LabelTemplate {
   id: string;
   name: string;
   width: number;
   height: number;
-  unit: Unit;
-  orientation: "portrait" | "landscape";
   elements: LabelElement[];
-};
+}
 
 const STORAGE_KEY = "dukaan-label-templates-v1";
-const FIELD_OPTIONS = [
-  ["name", "Product Name"], ["plu", "PLU Number"], ["code", "Barcode"], ["price", "Price"],
-  ["mrp", "MRP"], ["unitPrice", "Unit Price"], ["weight", "Weight"], ["unit", "UOM"],
-  ["totalPrice", "Total Price"], ["packedDate", "Packed Date"], ["useByDate", "Use By Date"],
-  ["qty", "Quantity"], ["batch", "Batch"], ["packedTime", "Packed Time"],
-] as const;
 
-const FIELD_TYPE_OPTIONS = [
-  { value: "dynamic", label: "Dynamic Data" },
-  { value: "text", label: "Text" },
-  { value: "static", label: "Static Value" },
-  { value: "price", label: "Price" },
-  { value: "number", label: "Number" },
-  { value: "date", label: "Date" },
-  { value: "time", label: "Time" },
-  { value: "barcode", label: "Barcode" },
-  { value: "qrcode", label: "QR Code" },
-  { value: "formula", label: "Formula" },
-] as const;
-
-const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const mmPerUnit = (unit: Unit) => unit === "cm"? 10 : unit === "in"? 25.4 : 1;
-const toMm = (value: number, unit: Unit) => value * mmPerUnit(unit);
-
-const formatValue = (el: LabelElement, product?: DesignerProduct) => {
-  if (!product) return "";
-  const key = el.dataSource || el.field || "name";
-  const custom = product.extraFields?.find((item) => item.label.toLowerCase() === key.toLowerCase() || item.label === key);
-  let value: any = custom?.value?? (product as unknown as Record<string, unknown>)[key]?? "";
-  if (el.type === "formula" && el.formula) {
-    try {
-      const fn = new Function('weight','unitPrice','price','qty','mrp',`return ${el.formula}`);
-      value = fn(product.weight||0, product.unitPrice||0, product.price||0, product.qty||1, product.mrp||0);
-    } catch {}
+const DEFAULT_TEMPLATES: LabelTemplate[] = [
+  {
+    id: "store-default",
+    name: "STORE 54x37 - Default",
+    width: 54, height: 37,
+    elements: [
+      { id: "e1", type: "text", x: 2, y: 2, width: 50, height: 5, field: "name", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
+      { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 12, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
+      { id: "e3", type: "text", x: 2, y: 21, width: 50, height: 3, field: "code", dataSource: "code", fontSize: 5, bold: false, color: "#000", align: "center", text: "" },
+      { id: "e4", type: "text", x: 2, y: 25, width: 16, height: 3, field: "packeddate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Packed: {{value}}" },
+      { id: "e5", type: "text", x: 19, y: 25, width: 16, height: 3, field: "uom", dataSource: "uom", fontSize: 6, bold: true, color: "#000", align: "center", text: "", displayFormat: "UOM: {{value}}" },
+      { id: "e6", type: "text", x: 36, y: 25, width: 16, height: 3, field: "usebydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
+      { id: "e7", type: "text", x: 2, y: 29, width: 15, height: 3, field: "plu", dataSource: "plu", fontSize: 6, bold: true, color: "#000", align: "left", text: "", displayFormat: "Link: {{value}}" },
+      { id: "e8", type: "text", x: 19, y: 29, width: 16, height: 3, field: "expiry", dataSource: "expiry", fontSize: 6, bold: true, color: "#000", align: "center", text: "" },
+      { id: "e9", type: "text", x: 36, y: 29, width: 16, height: 6, field: "unitprice", dataSource: "unitprice", fontSize: 9, bold: true, color: "#000", align: "right", text: "", displayFormat: "CDF {{value}}" },
+    ]
+  },
+  {
+    id: "prod-default",
+    name: "PRODUCTION 54x37 - QTY wala",
+    width: 54, height: 37,
+    elements: [
+      { id: "e1", type: "text", x: 2, y: 2, width: 50, height: 5, field: "name", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
+      { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 12, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
+      { id: "e3", type: "text", x: 2, y: 21, width: 50, height: 3, field: "code", dataSource: "code", fontSize: 5, bold: false, color: "#000", align: "center", text: "" },
+      { id: "e4", type: "text", x: 2, y: 25, width: 16, height: 3, field: "packeddate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Prod: {{value}}" },
+      { id: "e5", type: "text", x: 19, y: 25, width: 16, height: 3, field: "qty", dataSource: "qty", fontSize: 7, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}}" },
+      { id: "e6", type: "text", x: 36, y: 25, width: 16, height: 3, field: "usebydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
+      { id: "e7", type: "text", x: 2, y: 29, width: 50, height: 6, field: "qty", dataSource: "qty", fontSize: 10, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}} PCS" },
+    ]
   }
-  if (value === "" || value === null || value === undefined) return "";
-  let display = String(value);
-  if (["price","mrp","unitPrice","totalPrice"].includes(key) || el.type === "price") {
-    display = `₹${Number(value || 0).toLocaleString("en-IN")}`;
-  }
-  const fmt = el.displayFormat || "{{value}}";
-  return fmt.replaceAll("{{value}}", display).replaceAll(`{{${key}}}`, display);
-};
-
-// --- ONLY THIS PART CHANGED - ADDED QTY BADGE ---
-const defaultElements = (): LabelElement[] => [
-  { id: makeId(), type: "dynamic", field: "name", dataSource: "name", displayFormat: "{{value}}", x: 3, y: 3, width: 48, height: 6, fontSize: 13, bold: true, color: "#101b2d", align: "center" },
-  { id: makeId(), type: "dynamic", field: "qty", dataSource: "qty", displayFormat: "QTY: {{value}}", x: 3, y: 10, width: 18, height: 5, fontSize: 10, bold: true, color: "#101b2d", align: "left" },
-  { id: makeId(), type: "price", field: "mrp", dataSource: "mrp", displayFormat: "₹{{value}}", x: 24, y: 10, width: 23, height: 7, fontSize: 15, bold: true, color: "#101b2d", align: "right" },
-  { id: makeId(), type: "barcode", field: "code", dataSource: "code", x: 4, y: 19, width: 46, height: 8, fontSize: 7, color: "#101b2d", align: "center" },
-  { id: makeId(), type: "dynamic", field: "packedDate", dataSource: "packedDate", displayFormat: "Prod: {{value}}", x: 3, y: 29, width: 22, height: 4, fontSize: 7, bold: false, color: "#526176", align: "left" },
-  { id: makeId(), type: "dynamic", field: "useByDate", dataSource: "useByDate", displayFormat: "Exp: {{value}}", x: 28, y: 29, width: 22, height: 4, fontSize: 7, bold: false, color: "#526176", align: "right" },
 ];
 
-const builtInTemplate = (): LabelTemplate => ({ id: "essae-retail-54x37", name: "Essae Retail 54×37 mm", width: 54, height: 37, unit: "mm", orientation: "portrait", elements: defaultElements() });
-const blankTemplate = (name = "My new label"): LabelTemplate => ({ id: makeId(), name, width: 54, height: 37, unit: "mm", orientation: "portrait", elements: [] });
-function loadTemplates() { try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") as LabelTemplate[]; return saved.length? saved : [builtInTemplate()]; } catch { return [builtInTemplate()]; } }
-function saveTemplates(templates: LabelTemplate[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(templates)); }
+export default function LabelDesigner({ products }: { products: any[] }) {
+  const [templates, setTemplates] = useState<LabelTemplate[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [selectedElId, setSelectedElId] = useState<string>("");
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, elId: string } | null>(null);
 
-export default function LabelDesigner({ products }: { products: DesignerProduct[] }) {
-  const [templates, setTemplates] = useState<LabelTemplate[]>(loadTemplates);
-  const [selectedId, setSelectedId] = useState("essae-retail-54x37");
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [previewIndex, setPreviewIndex] = useState(0);
-  const [history, setHistory] = useState<LabelTemplate[][]>([]);
-  const [future, setFuture] = useState<LabelTemplate[][]>([]);
-  const [dragging, setDragging] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
-  const [showAddField, setShowAddField] = useState(false);
-  const [newFieldType, setNewFieldType] = useState<ElementType>("dynamic");
-  const [newFieldSource, setNewFieldSource] = useState("name");
-  const [newFieldFormat, setNewFieldFormat] = useState("{{value}}");
-  const [newFormula, setNewFormula] = useState("weight*unitPrice");
-  const canvasRef = useRef<HTMLDivElement | null>(null);
-  const template = templates.find((item) => item.id === selectedId) || templates[0];
-  const product = products[previewIndex] || products[0];
-  const selectedElement = template?.elements.find((item) => item.id === selectedElementId);
-  const fieldOptions = useMemo(() => {
-    const custom = Array.from(new Set(products.flatMap((item) => item.extraFields?.map((field) => field.label) || []))).map((field) => [field, field] as const);
-    return [...FIELD_OPTIONS,...custom];
-  }, [products]);
-
-  useEffect(() => { if (template) saveTemplates(templates); }, [templates, template]);
-  useEffect(() => { if (!dragging) return; const move = (event: PointerEvent) => { const rect = canvasRef.current?.getBoundingClientRect(); if (!rect ||!template) return; const nextX = ((event.clientX - rect.left) / rect.width) * template.width - dragging.offsetX; const nextY = ((event.clientY - rect.top) / rect.height) * template.height - dragging.offsetY; updateElement(dragging.id, { x: Math.max(0, Math.min(template.width - 2, nextX)), y: Math.max(0, Math.min(template.height - 2, nextY)) }, false); }; const up = () => setDragging(null); window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); return () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; });
-
-  const mutateTemplates = (next: LabelTemplate[]) => { setHistory((current) => [...current.slice(-24), templates]); setFuture([]); setTemplates(next); };
-  const updateTemplate = (patch: Partial<LabelTemplate>) => mutateTemplates(templates.map((item) => item.id === template.id? {...item,...patch } : item));
-  const updateElement = (id: string, patch: Partial<LabelElement>, record = true) => { const next = templates.map((item) => item.id === template.id? {...item, elements: item.elements.map((element) => element.id === id? {...element,...patch } : element) } : item); if (record) mutateTemplates(next); else setTemplates(next); };
-  const addElement = (type: ElementType, field?: string) => { const element: LabelElement = { id: makeId(), type, field, dataSource: field||"name", displayFormat: type==="price"?"₹{{value}}":"{{value}}", formula: type==="formula"?"weight*unitPrice":undefined, text: type === "text"? "Your text" : undefined, x: Math.max(2, template.width / 2 - 18), y: Math.max(2, template.height / 2 - 3), width: type === "barcode" || type==="qrcode"? Math.min(30, template.width - 6) : Math.min(34, template.width - 6), height: type === "barcode" || type==="qrcode"? 8 : 5, fontSize: type === "barcode"? 7 : 9, bold: true, color: "#101b2d", align: "left" }; mutateTemplates(templates.map((item) => item.id === template.id? {...item, elements: [...item.elements, element] } : item)); setSelectedElementId(element.id); };
-  const addCustomField = () => { const element: LabelElement = { id: makeId(), type: newFieldType, field: newFieldSource, dataSource: newFieldSource, displayFormat: newFieldFormat, formula: newFieldType==="formula"?newFormula:undefined, text: newFieldType==="static"?newFieldFormat:undefined, x: template.width/2-15, y: template.height/2-3, width: newFieldType==="barcode"||newFieldType==="qrcode"?28:32, height: 6, fontSize: 9, bold: true, color: "#101b2d", align: "left" }; mutateTemplates(templates.map((item) => item.id === template.id? {...item, elements: [...item.elements, element] } : item)); setShowAddField(false); setSelectedElementId(element.id); toast.success(`Added ${newFieldType}: ${newFieldSource}`); };
-  const deleteElement = () => { if (!selectedElementId) return; mutateTemplates(templates.map((item) => item.id === template.id? {...item, elements: item.elements.filter((element) => element.id!== selectedElementId) } : item)); setSelectedElementId(null); };
-  const undo = () => { const previous = history.at(-1); if (!previous) return; setFuture((current) => [...current, templates]); setHistory((current) => current.slice(0, -1)); setTemplates(previous); };
-  const redo = () => { const next = future.at(-1); if (!next) return; setHistory((current) => [...current, templates]); setFuture((current) => current.slice(0, -1)); setTemplates(next); };
-
-  const printTemplate = async () => {
-    if (!template ||!products.length) return toast.error("Upload product data before printing.");
-    const widthMm = toMm(template.width, template.unit); const heightMm = toMm(template.height, template.unit);
-    const pdf = new jsPDF({ orientation: template.orientation, unit: "mm", format: [widthMm, heightMm] });
-    const printProducts = products.flatMap((item) => Array.from({ length: item.copies || 1 }, () => item));
-    for (let index=0; index<printProducts.length; index++) {
-      const item = printProducts[index];
-      if (index) pdf.addPage([widthMm, heightMm], template.orientation);
-      for (const element of template.elements) {
-        const x = toMm(element.x, template.unit); const y = toMm(element.y, template.unit); const w = toMm(element.width, template.unit); const h = toMm(element.height, template.unit); const color = element.color || "#101b2d";
-        if (element.type === "rectangle") { pdf.setDrawColor(color); pdf.rect(x, y, w, h); continue; }
-        if (element.type === "line") { pdf.setDrawColor(color); pdf.line(x, y, x + w, y + h); continue; }
-        if (element.type === "barcode") { const canvas = document.createElement("canvas"); try { JsBarcode(canvas, formatValue(element, item) || "0", { format: "CODE128", width: 2, height: 40, displayValue: false, margin: 0, lineColor: color, background: "#ffffff" }); pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, y, w, h); } catch {} continue; }
-        if (element.type === "qrcode") { try { const val = formatValue(element, item) || "0"; const url = await QRCode.toDataURL(val, { margin: 1, width: 200 }); pdf.addImage(url, "PNG", x, y, w, h); } catch {} continue; }
-        const value = element.type === "text" || element.type==="static"? (element.text || "") : formatValue(element, item);
-        if (!value) continue; pdf.setTextColor(color); pdf.setFont("helvetica", element.bold? "bold" : "normal"); pdf.setFontSize(Math.max(4, element.fontSize)); const align = element.align || "left"; pdf.text(pdf.splitTextToSize(value, w), align === "right"? x + w : align === "center"? x + w / 2 : x, y + Math.min(h, element.fontSize / 2), { align });
+  const loadTemplates = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      if (saved.length === 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
+        setTemplates(DEFAULT_TEMPLATES);
+        setSelectedId(DEFAULT_TEMPLATES[0].id);
+      } else {
+        setTemplates(saved);
+        if (!selectedId) setSelectedId(saved[0].id);
       }
+    } catch {
+      setTemplates(DEFAULT_TEMPLATES);
+      setSelectedId(DEFAULT_TEMPLATES[0].id);
     }
-    pdf.save(`${template.name.replace(/[^a-z0-9]+/gi, "-")}.pdf`); toast.success(`Print PDF ${widthMm.toFixed(1)} × ${heightMm.toFixed(1)} mm`);
   };
 
-  const displayScale = useMemo(() => Math.min(1, 520 / Math.max(1, toMm(template.width, template.unit))), [template]);
-  if (!template) return null;
+  useEffect(() => {
+    loadTemplates();
+    const handler = () => loadTemplates();
+    window.addEventListener("templates-updated", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("templates-updated", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
+
+  const selectedTemplate = templates.find(t => t.id === selectedId);
+  const selectedEl = selectedTemplate?.elements.find(e => e.id === selectedElId);
+
+  const saveTemplates = (newTemplates: LabelTemplate[]) => {
+    setTemplates(newTemplates);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(newTemplates));
+  };
+
+  const updateElement = (elId: string, patch: Partial<LabelElement>) => {
+    const newTemplates = templates.map(t => t.id === selectedId? {...t, elements: t.elements.map(e => e.id === elId? {...e,...patch } : e) } : t);
+    saveTemplates(newTemplates);
+  };
+
+  const fieldOptions = [
+    { value: "name", label: "Product Name / ITEM NAME" },
+    { value: "code", label: "Barcode / BARCODE" },
+    { value: "plu", label: "PLU No / Label Link No" },
+    { value: "uom", label: "UOM - PC / WT / GRM" },
+    { value: "unitprice", label: "Unit Price / Price" },
+    { value: "totalprice", label: "Total Price" },
+    { value: "packeddate", label: "Packed Date / Production Date" },
+    { value: "usebydate", label: "Expiry Date / UseBy Date" },
+    { value: "expiry", label: "Validity / Expiry Days" },
+    { value: "qty", label: "QTY / Quantity - PRODUCTION ke liye" },
+  ];
+
+  if (!selectedTemplate) return null;
+
+  const sample = products[0] || { name: "Sample Product", code: "800000001", plu: "1", unit: "PC", unitPrice: 4300, price: 4300, packedDate: "01/01/1970", useByDate: "01/01/1970", expiryDays: 3, qty: 225 };
+
+  const getValue = (dataSource: string) => {
+    const map: any = {
+      name: sample.name,
+      code: sample.code,
+      plu: sample.plu || sample.labelTemplate || "1",
+      uom: sample.unit || "PC",
+      unitprice: sample.unitPrice || sample.price,
+      totalprice: sample.totalPrice || sample.price,
+      packeddate: sample.packedDate,
+      usebydate: sample.useByDate,
+      expiry: sample.expiryDays? `${sample.expiryDays} Days` : "3 Days",
+      qty: sample.qty || 1,
+    };
+    return map[dataSource] || dataSource;
+  };
 
   return (
-  <section className="designer-section anchor-section" id="labels">
-    <div className="designer-heading"><div><div className="section-kicker section-kicker--coral"><span className="kicker-dot" />MY LABELS</div><h2>Design once. Print whenever you need.</h2><p>Dynamic Field Creator: Choose Field Type, Data Source (Excel columns) and Display Format.</p></div><div className="designer-actions"><Button className="button button--dark button--small" onClick={()=>{const next={...blankTemplate(), id:makeId()}; mutateTemplates([...templates,next]); setSelectedId(next.id);}}><Plus size={15} />Create label</Button></div></div>
-    <div className="designer-layout">
-      <aside className="template-library"><div className="panel-title"><span>MY LABELS</span><Badge variant="outline">{templates.length}</Badge></div><div className="template-list">{templates.map((item) => <button key={item.id} className={item.id === template.id? "template-item template-item--active" : "template-item"} onClick={() => { setSelectedId(item.id); setSelectedElementId(null); }}><span className="template-item__copy"><strong>{item.name}</strong><small>{item.width} × {item.height} {item.unit}</small></span></button>)}</div></aside>
-      <div className="designer-main"><div className="designer-toolbar"><div className="toolbar-group"><button onClick={undo} disabled={!history.length}><Undo2 size={16} /></button><button onClick={redo} disabled={!future.length}><Redo2 size={16} /></button><span className="toolbar-divider" /><Badge className="badge-soft"><Grid3X3 size={13} />Snap grid</Badge><Badge variant="outline">{template.width} × {template.height} {template.unit}</Badge></div></div><div className="designer-canvas-wrap"><div className="designer-canvas" ref={canvasRef} style={{ width: `${Math.max(220, Math.min(560, toMm(template.width, template.unit) * displayScale))}px`, aspectRatio: `${template.width}/${template.height}` }}><div className="canvas-grid" />{template.elements.map((element) => { const selected = element.id === selectedElementId; const value = element.type==="text"||element.type==="static"? element.text : formatValue(element, product); return <div key={element.id} className={`canvas-element canvas-element--${element.type} ${selected? "canvas-element--selected" : ""}`} style={{ left: `${(element.x / template.width) * 100}%`, top: `${(element.y / template.height) * 100}%`, width: `${(element.width / template.width) * 100}%`, height: `${(element.height / template.height) * 100}%`, color: element.color, fontSize: `${Math.max(6, element.fontSize * displayScale)}px`, fontWeight: element.bold? 700 : 400, textAlign: element.align || "left", transform: `rotate(${element.rotation || 0}deg)` }} onPointerDown={(event) => { event.stopPropagation(); const rect = canvasRef.current?.getBoundingClientRect(); if (!rect) return; setSelectedElementId(element.id); setDragging({ id: element.id, offsetX: ((event.clientX - rect.left) / rect.width) * template.width - element.x, offsetY: ((event.clientY - rect.top) / rect.height) * template.height - element.y }); }}>{element.type === "barcode"? <Barcode size={22} /> : element.type==="qrcode"? <span style={{fontSize:10, fontWeight:700}}>QR:{formatValue(element, product).slice(0,10)}</span> : element.type === "rectangle" || element.type==="line"? null : value || <span className="canvas-placeholder">{element.dataSource||element.field}</span>}</div>; })}</div></div><div className="designer-preview-nav"><button onClick={() => setPreviewIndex((current) => Math.max(0, current - 1))} disabled={!products.length || previewIndex === 0}>Previous</button><span>{products.length? `Product ${previewIndex + 1} of ${products.length}` : "Upload data to preview"}</span><button onClick={() => setPreviewIndex((current) => Math.min(products.length - 1, current + 1))} disabled={!products.length || previewIndex >= products.length - 1}>Next</button></div></div>
-      <aside className="designer-inspector">
-        <div className="panel-title"><span>DESIGN LABEL</span><Layers size={15} /></div>
-        <div className="inspector-section"><label>Label name</label><div className="inspector-inline"><Input value={template.name} onChange={(event) => updateTemplate({ name: event.target.value })} /><button onClick={() => toast.success("Saved locally")}><Save size={15} /></button></div></div>
-        <div className="inspector-section"><label>Physical size</label><div className="size-grid"><Input type="number" min="1" value={template.width} onChange={(event) => updateTemplate({ width: Number(event.target.value) || 1 })} /><Input type="number" min="1" value={template.height} onChange={(event) => updateTemplate({ height: Number(event.target.value) || 1 })} /><select value={template.unit} onChange={(event) => updateTemplate({ unit: event.target.value as Unit })}><option value="mm">mm</option><option value="cm">cm</option><option value="in">inch</option></select></div></div>
-        <div className="inspector-section" style={{background:"#101b2d", color:"#fff", padding:12, borderRadius:10}}>
-          <label style={{color:"#d4ff32", fontWeight:700}}>+ Add Field - Dynamic Creator</label>
-          {!showAddField? <Button onClick={()=>setShowAddField(true)} style={{width:"100%", marginTop:8, background:"#d4ff32", color:"#000"}}><Plus size={14}/> Add New Field</Button> :
-          <div style={{marginTop:10, background:"#fff", color:"#000", padding:10, borderRadius:8}}>
-            <label>Field Type</label>
-            <select value={newFieldType} onChange={(e)=>setNewFieldType(e.target.value as any)} style={{width:"100%", padding:6, border:"1px solid #ddd", borderRadius:6, marginBottom:8}}>
-              {FIELD_TYPE_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <label>Data Source (Excel Column)</label>
-            <select value={newFieldSource} onChange={(e)=>setNewFieldSource(e.target.value)} style={{width:"100%", padding:6, border:"1px solid #ddd", borderRadius:6, marginBottom:8}}>
-              {fieldOptions.map(([f,l])=><option key={f} value={f}>{l} ({f})</option>)}
-            </select>
-            {newFieldType==="formula" && <><label>Formula</label><Input value={newFormula} onChange={(e)=>setNewFormula(e.target.value)} placeholder="weight*unitPrice" style={{marginBottom:8}}/></>}
-            <label>Display Format</label>
-            <Input value={newFieldFormat} onChange={(e)=>setNewFieldFormat(e.target.value)} placeholder="₹{{value}} or {{value}} kg" style={{marginBottom:8}}/>
-            <div style={{display:"flex", gap:8}}><Button onClick={addCustomField} className="button--dark" style={{flex:1}}>Add to Label</Button><Button variant="outline" onClick={()=>setShowAddField(false)} style={{flex:1}}>Cancel</Button></div>
-          </div>}
+    <div id="labels" className="bg-white rounded-xl border p-4 mt-6 anchor-section">
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+        <h2 className="font-bold text-lg">My Labels - Azure/ZPL jaisa Editor - Right Click se Field Change</h2>
+        <div className="flex gap-2">
+          {templates.map(t => (
+            <button key={t.id} onClick={() => setSelectedId(t.id)} className={`px-3 py-1.5 rounded text-xs border ${selectedId === t.id? "bg-black text-white" : "bg-gray-100"}`}>
+              {t.name}
+            </button>
+          ))}
         </div>
-        <div className="inspector-section"><label>Quick add</label><div className="element-palette">{fieldOptions.slice(0,8).map(([field, label]) => <button key={field} onClick={() => addElement("dynamic", field)}><Plus size={12} />{label}</button>)}<button onClick={() => addElement("text")}><Plus size={12} />Static text</button><button onClick={() => addElement("barcode", "code")}><Barcode size={12} />Barcode</button><button onClick={() => addElement("qrcode", "code")}><Barcode size={12} />QR Code</button><button onClick={() => addElement("formula")}><Plus size={12} />Formula</button></div></div>
-        {selectedElement && <div className="inspector-section"><label>Selected: {selectedElement.type} ({selectedElement.dataSource})</label><div className="size-grid"><Input type="number" value={selectedElement.x} onChange={(event) => updateElement(selectedElement.id, { x: Number(event.target.value) })} /><Input type="number" value={selectedElement.y} onChange={(event) => updateElement(selectedElement.id, { y: Number(event.target.value) })} /><Input type="number" value={selectedElement.width} onChange={(event) => updateElement(selectedElement.id, { width: Number(event.target.value) })} /><Input type="number" value={selectedElement.height} onChange={(event) => updateElement(selectedElement.id, { height: Number(event.target.value) })} /></div><div style={{display:"flex", gap:6, marginTop:8}}><Input type="number" value={selectedElement.fontSize} onChange={(event) => updateElement(selectedElement.id, { fontSize: Number(event.target.value) })} style={{flex:1}}/><button onClick={() => updateElement(selectedElement.id, { bold:!selectedElement.bold })} style={{padding:"4px 8px", border:"1px solid #ddd", background: selectedElement.bold?"#000":"#fff", color:selectedElement.bold?"#fff":"#000"}}>B</button><button onClick={() => updateElement(selectedElement.id, { rotation: (selectedElement.rotation || 0) + 90 })} style={{padding:"4px 8px", border:"1px solid #ddd"}}><RotateCw size={13} /></button><button onClick={deleteElement} style={{padding:"4px 8px", border:"1px solid #ddd"}}><Trash2 size={13}/></button></div><label style={{marginTop:8, display:"block"}}>Display Format</label><Input value={selectedElement.displayFormat||""} onChange={(event) => updateElement(selectedElement.id, { displayFormat: event.target.value })} placeholder="₹{{value}}"/></div>}
-        <div className="inspector-footer"><Button className="button button--dark button--full" onClick={printTemplate} disabled={!products.length}><Printer size={15} />Print selected label</Button><span><FileJson size={13} />Saved locally</span></div>
-      </aside>
+      </div>
+
+      <div className="grid md:grid-cols-[1fr_280px] gap-4">
+        {/* LABEL PREVIEW - 54x37 actual */}
+        <div className="bg-gray-100 p-6 rounded-lg flex justify-center items-center min-h-[300px] relative">
+          <div className="bg-white border-2 border-black shadow-lg relative" style={{ width: selectedTemplate.width * 3.78, height: selectedTemplate.height * 3.78 }}>
+            {selectedTemplate.elements.map(el => {
+              const rawVal = getValue(el.dataSource);
+              const displayVal = el.displayFormat? el.displayFormat.replace("{{value}}", String(rawVal)) : String(rawVal);
+              const isSelected = selectedElId === el.id;
+              return (
+                <div
+                  key={el.id}
+                  onClick={() => setSelectedElId(el.id)}
+                  onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, elId: el.id }); setSelectedElId(el.id); }}
+                  className={`absolute cursor-move hover:bg-yellow-100 ${isSelected? "bg-blue-100 ring-2 ring-blue-500" : ""}`}
+                  style={{
+                    left: el.x * 3.78, top: el.y * 3.78, width: el.width * 3.78, height: el.height * 3.78,
+                    fontSize: el.fontSize, fontWeight: el.bold? 700 : 400, color: el.color,
+                    textAlign: el.align, display: "flex", alignItems: "center",
+                    justifyContent: el.align === "center"? "center" : el.align === "right"? "flex-end" : "flex-start",
+                    overflow: "hidden", lineHeight: 1.1, whiteSpace: "nowrap"
+                  }}
+                  title="Right Click karo field change karne ke liye"
+                >
+                  {el.type === "barcode"? <div className="w-full h-full bg-black/10 flex items-center justify-center text-[6px]">|||| {displayVal} ||||</div> : displayVal}
+                </div>
+              );
+            })}
+          </div>
+          <div className="absolute bottom-2 left-2 text-[10px] text-gray-500">Right Click on any field - UOM, Date, Price change kar sakte ho</div>
+        </div>
+
+        {/* PROPERTIES PANEL */}
+        <div className="border rounded-lg p-3 bg-gray-50">
+          <h3 className="font-bold text-sm mb-3">Field Edit - Manual Setting</h3>
+          {!selectedEl? <p className="text-xs text-gray-500">Label par kisi bhi field par click karo ya right click karo. Jaise UOM par right click karoge to saare fields dikhenge.</p> : (
+            <div className="space-y-3">
+              <div><label className="text-[10px] font-bold">Data Source - Field Kya Dikhana Hai</label>
+                <select value={selectedEl.dataSource} onChange={(e) => updateElement(selectedEl.id, { dataSource: e.target.value, field: e.target.value })} className="w-full border rounded h-8 text-xs px-2 mt-1">
+                  {fieldOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                <p className="text-[9px] text-gray-500 mt-1">UOM ke liye uom select karo, Validity ke liye expiry, Date ke liye packeddate/usebydate</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className="text-[10px]">X mm</label><input type="number" step={0.5} value={selectedEl.x} onChange={(e) => updateElement(selectedEl.id, { x: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
+                <div><label className="text-[10px]">Y mm</label><input type="number" step={0.5} value={selectedEl.y} onChange={(e) => updateElement(selectedEl.id, { y: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
+                <div><label className="text-[10px]">W mm</label><input type="number" step={0.5} value={selectedEl.width} onChange={(e) => updateElement(selectedEl.id, { width: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
+                <div><label className="text-[10px]">H mm</label><input type="number" step={0.5} value={selectedEl.height} onChange={(e) => updateElement(selectedEl.id, { height: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
+              </div>
+              <div><label className="text-[10px]">Font Size</label><input type="number" value={selectedEl.fontSize} onChange={(e) => updateElement(selectedEl.id, { fontSize: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
+              <div><label className="text-[10px]">Display Format - jaise CDF ke liye</label><input value={selectedEl.displayFormat || ""} onChange={(e) => updateElement(selectedEl.id, { displayFormat: e.target.value })} placeholder="CDF {{value}} ya Packed: {{value}}" className="w-full border rounded h-7 text-xs px-1" /></div>
+              <div className="flex gap-2">
+                <button onClick={() => updateElement(selectedEl.id, { bold:!selectedEl.bold })} className={`flex-1 h-7 rounded text-xs border ${selectedEl.bold? "bg-black text-white" : "bg-white"}`}>Bold</button>
+                <button onClick={() => { if (confirm("Delete this field?")) { const newTemplates = templates.map(t => t.id === selectedId? {...t, elements: t.elements.filter(e => e.id!== selectedEl.id) } : t); saveTemplates(newTemplates); setSelectedElId(""); } }} className="flex-1 h-7 rounded text-xs bg-red-600 text-white">Delete</button>
+              </div>
+              <div className="text-[10px] bg-yellow-50 p-2 rounded border">Tip: UOM par right click karo, to UOM, PC/WT, Link No change kar sakte ho. Date par click karo to Production/Expiry change kar sakte ho. Yehi Azure/ZPL me hota hai.</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* CONTEXT MENU - Right Click wala */}
+      {contextMenu && (
+        <div className="fixed bg-white border shadow-2xl rounded-lg p-2 z-[9999] w-64" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseLeave={() => setContextMenu(null)}>
+          <div className="text-[11px] font-bold mb-2 border-b pb-1">Field Select Karo - Jaise Azure/ZPL</div>
+          {fieldOptions.map(opt => (
+            <button key={opt.value} className="w-full text-left text-xs px-3 py-2 hover:bg-black hover:text-white rounded flex justify-between" onClick={() => {
+              updateElement(contextMenu.elId, { dataSource: opt.value, field: opt.value });
+              setContextMenu(null);
+              toast.success(`${opt.label} set ho gaya`);
+            }}>
+              <span>{opt.label}</span><span className="text-[9px] opacity-60">{opt.value}</span>
+            </button>
+          ))}
+          <button className="w-full text-left text-xs px-3 py-2 hover:bg-red-600 hover:text-white rounded mt-2 border-t" onClick={() => setContextMenu(null)}>Close</button>
+        </div>
+      )}
     </div>
-  </section>
   );
 }
