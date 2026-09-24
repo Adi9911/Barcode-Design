@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
 import { jsPDF } from "jspdf";
 import {
   Barcode,
-  Copy,
-  Download,
   FileJson,
   Grid3X3,
   Layers,
@@ -17,8 +14,6 @@ import {
   Trash2,
   Undo2,
   Redo2,
-  Upload,
-  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -144,7 +139,6 @@ export default function LabelDesigner({ products }: { products: DesignerProduct[
   const [newFieldSource, setNewFieldSource] = useState("name");
   const [newFieldFormat, setNewFieldFormat] = useState("{{value}}");
   const [newFormula, setNewFormula] = useState("weight*unitPrice");
-  const importRef = useRef<HTMLInputElement | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const template = templates.find((item) => item.id === selectedId) || templates[0];
   const product = products[previewIndex] || products[0];
@@ -163,7 +157,6 @@ export default function LabelDesigner({ products }: { products: DesignerProduct[
   const addElement = (type: ElementType, field?: string) => { const element: LabelElement = { id: makeId(), type, field, dataSource: field||"name", displayFormat: type==="price"?"₹{{value}}":"{{value}}", formula: type==="formula"?"weight*unitPrice":undefined, text: type === "text"? "Your text" : undefined, x: Math.max(2, template.width / 2 - 18), y: Math.max(2, template.height / 2 - 3), width: type === "barcode" || type==="qrcode"? Math.min(30, template.width - 6) : Math.min(34, template.width - 6), height: type === "barcode" || type==="qrcode"? 8 : 5, fontSize: type === "barcode"? 7 : 9, bold: true, color: "#101b2d", align: "left" }; mutateTemplates(templates.map((item) => item.id === template.id? {...item, elements: [...item.elements, element] } : item)); setSelectedElementId(element.id); };
   const addCustomField = () => { const element: LabelElement = { id: makeId(), type: newFieldType, field: newFieldSource, dataSource: newFieldSource, displayFormat: newFieldFormat, formula: newFieldType==="formula"?newFormula:undefined, text: newFieldType==="static"?newFieldFormat:undefined, x: template.width/2-15, y: template.height/2-3, width: newFieldType==="barcode"||newFieldType==="qrcode"?28:32, height: 6, fontSize: 9, bold: true, color: "#101b2d", align: "left" }; mutateTemplates(templates.map((item) => item.id === template.id? {...item, elements: [...item.elements, element] } : item)); setShowAddField(false); setSelectedElementId(element.id); toast.success(`Added ${newFieldType}: ${newFieldSource}`); };
   const deleteElement = () => { if (!selectedElementId) return; mutateTemplates(templates.map((item) => item.id === template.id? {...item, elements: item.elements.filter((element) => element.id!== selectedElementId) } : item)); setSelectedElementId(null); };
-  const duplicateElement = () => { if (!selectedElement) return; const copy = {...selectedElement, id: makeId(), x: selectedElement.x + 2, y: selectedElement.y + 2 }; mutateTemplates(templates.map((item) => item.id === template.id? {...item, elements: [...item.elements, copy] } : item)); setSelectedElementId(copy.id); };
   const undo = () => { const previous = history.at(-1); if (!previous) return; setFuture((current) => [...current, templates]); setHistory((current) => current.slice(0, -1)); setTemplates(previous); };
   const redo = () => { const next = future.at(-1); if (!next) return; setHistory((current) => [...current, templates]); setFuture((current) => current.slice(0, -1)); setTemplates(next); };
 
@@ -200,7 +193,6 @@ export default function LabelDesigner({ products }: { products: DesignerProduct[
         <div className="panel-title"><span>DESIGN LABEL</span><Layers size={15} /></div>
         <div className="inspector-section"><label>Label name</label><div className="inspector-inline"><Input value={template.name} onChange={(event) => updateTemplate({ name: event.target.value })} /><button onClick={() => toast.success("Saved locally")}><Save size={15} /></button></div></div>
         <div className="inspector-section"><label>Physical size</label><div className="size-grid"><Input type="number" min="1" value={template.width} onChange={(event) => updateTemplate({ width: Number(event.target.value) || 1 })} /><Input type="number" min="1" value={template.height} onChange={(event) => updateTemplate({ height: Number(event.target.value) || 1 })} /><select value={template.unit} onChange={(event) => updateTemplate({ unit: event.target.value as Unit })}><option value="mm">mm</option><option value="cm">cm</option><option value="in">inch</option></select></div></div>
-
         <div className="inspector-section" style={{background:"#101b2d", color:"#fff", padding:12, borderRadius:10}}>
           <label style={{color:"#d4ff32", fontWeight:700}}>+ Add Field - Dynamic Creator</label>
           {!showAddField? <Button onClick={()=>setShowAddField(true)} style={{width:"100%", marginTop:8, background:"#d4ff32", color:"#000"}}><Plus size={14}/> Add New Field</Button> :
@@ -219,15 +211,11 @@ export default function LabelDesigner({ products }: { products: DesignerProduct[
             <div style={{display:"flex", gap:8}}><Button onClick={addCustomField} className="button--dark" style={{flex:1}}>Add to Label</Button><Button variant="outline" onClick={()=>setShowAddField(false)} style={{flex:1}}>Cancel</Button></div>
           </div>}
         </div>
-
         <div className="inspector-section"><label>Quick add</label><div className="element-palette">{fieldOptions.slice(0,8).map(([field, label]) => <button key={field} onClick={() => addElement("dynamic", field)}><Plus size={12} />{label}</button>)}<button onClick={() => addElement("text")}><Plus size={12} />Static text</button><button onClick={() => addElement("barcode", "code")}><Barcode size={12} />Barcode</button><button onClick={() => addElement("qrcode", "code")}><Barcode size={12} />QR Code</button><button onClick={() => addElement("formula")}><Plus size={12} />Formula</button></div></div>
-
-        {selectedElement && <div className="inspector-section"><label>Selected: {selectedElement.type} ({selectedElement.dataSource})</label><div className="size-grid"><Input type="number" value={selectedElement.x} onChange={(event) => updateElement(selectedElement.id, { x: Number(event.target.value) })} /><Input type="number" value={selectedElement.y} onChange={(event) => updateElement(selectedElement.id, { y: Number(event.target.value) })} /><Input type="number" value={selectedElement.width} onChange={(event) => updateElement(selectedElement.id, { width: Number(event.target.value) })} /><Input type="number" value={selectedElement.height} onChange={(event) => updateElement(selectedElement.id, { height: Number(event.target.value) })} /></div><div className="inspector-control-row" style={{display:"flex", gap:6, marginTop:8}}><Input type="number" value={selectedElement.fontSize} onChange={(event) => updateElement(selectedElement.id, { fontSize: Number(event.target.value) })} style={{flex:1}}/><button onClick={() => updateElement(selectedElement.id, { bold:!selectedElement.bold })} style={{padding:"4px 8px", border:"1px solid #ddd", background: selectedElement.bold?"#000":"#fff", color:selectedElement.bold?"#fff":"#000"}}>B</button><button onClick={() => updateElement(selectedElement.id, { rotation: (selectedElement.rotation || 0) + 90 })} style={{padding:"4px 8px", border:"1px solid #ddd"}}><RotateCw size={13} /></button><button onClick={deleteElement} style={{padding:"4px 8px", border:"1px solid #ddd"}}><Trash2 size={13}/></button></div><label style={{marginTop:8, display:"block"}}>Display Format</label><Input value={selectedElement.displayFormat||""} onChange={(event) => updateElement(selectedElement.id, { displayFormat: event.target.value })} placeholder="₹{{value}}"/></div>}
-
+        {selectedElement && <div className="inspector-section"><label>Selected: {selectedElement.type} ({selectedElement.dataSource})</label><div className="size-grid"><Input type="number" value={selectedElement.x} onChange={(event) => updateElement(selectedElement.id, { x: Number(event.target.value) })} /><Input type="number" value={selectedElement.y} onChange={(event) => updateElement(selectedElement.id, { y: Number(event.target.value) })} /><Input type="number" value={selectedElement.width} onChange={(event) => updateElement(selectedElement.id, { width: Number(event.target.value) })} /><Input type="number" value={selectedElement.height} onChange={(event) => updateElement(selectedElement.id, { height: Number(event.target.value) })} /></div><div style={{display:"flex", gap:6, marginTop:8}}><Input type="number" value={selectedElement.fontSize} onChange={(event) => updateElement(selectedElement.id, { fontSize: Number(event.target.value) })} style={{flex:1}}/><button onClick={() => updateElement(selectedElement.id, { bold:!selectedElement.bold })} style={{padding:"4px 8px", border:"1px solid #ddd", background: selectedElement.bold?"#000":"#fff", color:selectedElement.bold?"#fff":"#000"}}>B</button><button onClick={() => updateElement(selectedElement.id, { rotation: (selectedElement.rotation || 0) + 90 })} style={{padding:"4px 8px", border:"1px solid #ddd"}}><RotateCw size={13} /></button><button onClick={deleteElement} style={{padding:"4px 8px", border:"1px solid #ddd"}}><Trash2 size={13}/></button></div><label style={{marginTop:8, display:"block"}}>Display Format</label><Input value={selectedElement.displayFormat||""} onChange={(event) => updateElement(selectedElement.id, { displayFormat: event.target.value })} placeholder="₹{{value}}"/></div>}
         <div className="inspector-footer"><Button className="button button--dark button--full" onClick={printTemplate} disabled={!products.length}><Printer size={15} />Print selected label</Button><span><FileJson size={13} />Saved locally</span></div>
       </aside>
     </div>
      </section>
   );
 }
-
