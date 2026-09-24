@@ -807,8 +807,7 @@ export default function Home() {
             </div>
           </div>
 
-         // ✅ YE PASTE KARO - NAYA FIX
-          <div className="bg-white rounded-xl p-2 flex gap-2 border shadow-sm mb-3 flex-wrap items-center">
+                  <div className="bg-white rounded-xl p-2 flex gap-2 border shadow-sm mb-3 flex-wrap items-center">
             <Button
               onClick={() => {
                 setActiveTab("store");
