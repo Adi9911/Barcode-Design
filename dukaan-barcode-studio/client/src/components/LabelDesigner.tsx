@@ -115,10 +115,14 @@ const formatValue = (el: LabelElement, product?: DesignerProduct) => {
   return fmt.replaceAll("{{value}}", display).replaceAll(`{{${key}}}`, display);
 };
 
+// --- ONLY THIS PART CHANGED - ADDED QTY BADGE ---
 const defaultElements = (): LabelElement[] => [
   { id: makeId(), type: "dynamic", field: "name", dataSource: "name", displayFormat: "{{value}}", x: 3, y: 3, width: 48, height: 6, fontSize: 13, bold: true, color: "#101b2d", align: "center" },
-  { id: makeId(), type: "price", field: "mrp", dataSource: "mrp", displayFormat: "₹{{value}}", x: 3, y: 10, width: 23, height: 7, fontSize: 15, bold: true, color: "#101b2d", align: "left" },
+  { id: makeId(), type: "dynamic", field: "qty", dataSource: "qty", displayFormat: "QTY: {{value}}", x: 3, y: 10, width: 18, height: 5, fontSize: 10, bold: true, color: "#101b2d", align: "left" },
+  { id: makeId(), type: "price", field: "mrp", dataSource: "mrp", displayFormat: "₹{{value}}", x: 24, y: 10, width: 23, height: 7, fontSize: 15, bold: true, color: "#101b2d", align: "right" },
   { id: makeId(), type: "barcode", field: "code", dataSource: "code", x: 4, y: 19, width: 46, height: 8, fontSize: 7, color: "#101b2d", align: "center" },
+  { id: makeId(), type: "dynamic", field: "packedDate", dataSource: "packedDate", displayFormat: "Prod: {{value}}", x: 3, y: 29, width: 22, height: 4, fontSize: 7, bold: false, color: "#526176", align: "left" },
+  { id: makeId(), type: "dynamic", field: "useByDate", dataSource: "useByDate", displayFormat: "Exp: {{value}}", x: 28, y: 29, width: 22, height: 4, fontSize: 7, bold: false, color: "#526176", align: "right" },
 ];
 
 const builtInTemplate = (): LabelTemplate => ({ id: "essae-retail-54x37", name: "Essae Retail 54×37 mm", width: 54, height: 37, unit: "mm", orientation: "portrait", elements: defaultElements() });
