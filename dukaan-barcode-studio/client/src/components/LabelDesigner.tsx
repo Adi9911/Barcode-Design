@@ -25,28 +25,28 @@ export interface LabelTemplate {
 
 const STORAGE_KEY = "dukaan-label-templates-v1";
 
-// CDN wala Real Barcode - bina npm ke
-function RealBarcode({ value, height }: { value: string, width: number, height: number }) {
+// FIXED - Print me bada nahi hoga
+function RealBarcode({ value }: { value: string, width: number, height: number }) {
   const svgRef = useRef<SVGSVGElement>(null);
   useEffect(() => {
     // @ts-ignore
     const JsBarcode = (window as any).JsBarcode;
     if (svgRef.current && value && JsBarcode) {
       try {
-        const cleanVal = String(value).replace(/[^0-9A-Za-z]/g, "").trim() || "000000";
+        const cleanVal = String(value).replace(/[^0-9A-Za-z]/g, "").trim() || "8000000010";
         JsBarcode(svgRef.current, cleanVal, {
           format: "CODE128",
-          width: 2.4,
-          height: height * 3.78 * 0.95,
+          width: 1.4,
+          height: 24,
           displayValue: false,
           margin: 0,
           background: "#ffffff",
           lineColor: "#000000",
         });
-      } catch (e) { console.log(e); }
+      } catch (e) {}
     }
-  }, [value, height]);
-  return <svg ref={svgRef} style={{ width: "100%", height: "100%" }} />;
+  }, [value]);
+  return <svg ref={svgRef} style={{ width: "100%", height: "100%", display: "block" }} />;
 }
 
 const DEFAULT_TEMPLATES: LabelTemplate[] = [
@@ -195,39 +195,27 @@ export default function LabelDesigner({ products }: { products: any[] }) {
                     justifyContent: el.align === "center"? "center" : el.align === "right"? "flex-end" : "flex-start",
                     overflow: "hidden", lineHeight: 1.1, whiteSpace: "nowrap"
                   }}
-                  title="Right Click karo field change karne ke liye"
                 >
                   {el.type === "barcode"? <RealBarcode value={String(rawVal)} width={el.width} height={el.height} /> : displayVal}
                 </div>
               );
             })}
           </div>
-          <div className="absolute bottom-2 left-2 text-[10px] text-gray-500">Full width real barcode - blur me bhi scan hoga - Right Click se field change</div>
         </div>
 
         <div className="border rounded-lg p-3 bg-gray-50">
-          <h3 className="font-bold text-sm mb-3">Field Edit - Manual Setting</h3>
-          {!selectedEl? <p className="text-xs text-gray-500">Label par kisi bhi field par click karo ya right click karo. Jaise UOM par right click karoge to saare fields dikhenge.</p> : (
+          <h3 className="font-bold text-sm mb-3">Field Edit</h3>
+          {!selectedEl? <p className="text-xs text-gray-500">Label par click karo</p> : (
             <div className="space-y-3">
-              <div><label className="text-[10px] font-bold">Data Source - Field Kya Dikhana Hai</label>
-                <select value={selectedEl.dataSource} onChange={(e) => updateElement(selectedEl.id, { dataSource: e.target.value, field: e.target.value })} className="w-full border rounded h-8 text-xs px-2 mt-1">
-                  {fieldOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-                <p className="text-[9px] text-gray-500 mt-1">UOM ke liye uom select karo, Validity ke liye expiry, Date ke liye packeddate/usebydate</p>
-              </div>
+              <select value={selectedEl.dataSource} onChange={(e) => updateElement(selectedEl.id, { dataSource: e.target.value, field: e.target.value })} className="w-full border rounded h-8 text-xs px-2">
+                {fieldOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
               <div className="grid grid-cols-2 gap-2">
-                <div><label className="text-[10px]">X mm</label><input type="number" step={0.5} value={selectedEl.x} onChange={(e) => updateElement(selectedEl.id, { x: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
-                <div><label className="text-[10px]">Y mm</label><input type="number" step={0.5} value={selectedEl.y} onChange={(e) => updateElement(selectedEl.id, { y: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
-                <div><label className="text-[10px]">W mm</label><input type="number" step={0.5} value={selectedEl.width} onChange={(e) => updateElement(selectedEl.id, { width: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
-                <div><label className="text-[10px]">H mm</label><input type="number" step={0.5} value={selectedEl.height} onChange={(e) => updateElement(selectedEl.id, { height: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
+                <input type="number" step={0.5} value={selectedEl.x} onChange={(e) => updateElement(selectedEl.id, { x: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" placeholder="X" />
+                <input type="number" step={0.5} value={selectedEl.y} onChange={(e) => updateElement(selectedEl.id, { y: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" placeholder="Y" />
+                <input type="number" step={0.5} value={selectedEl.width} onChange={(e) => updateElement(selectedEl.id, { width: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" placeholder="W" />
+                <input type="number" step={0.5} value={selectedEl.height} onChange={(e) => updateElement(selectedEl.id, { height: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" placeholder="H" />
               </div>
-              <div><label className="text-[10px]">Font Size</label><input type="number" value={selectedEl.fontSize} onChange={(e) => updateElement(selectedEl.id, { fontSize: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" /></div>
-              <div><label className="text-[10px]">Display Format - jaise CDF ke liye</label><input value={selectedEl.displayFormat || ""} onChange={(e) => updateElement(selectedEl.id, { displayFormat: e.target.value })} placeholder="CDF {{value}} ya Packed: {{value}}" className="w-full border rounded h-7 text-xs px-1" /></div>
-              <div className="flex gap-2">
-                <button onClick={() => updateElement(selectedEl.id, { bold:!selectedEl.bold })} className={`flex-1 h-7 rounded text-xs border ${selectedEl.bold? "bg-black text-white" : "bg-white"}`}>Bold</button>
-                <button onClick={() => { if (confirm("Delete this field?")) { const newTemplates = templates.map(t => t.id === selectedId? {...t, elements: t.elements.filter(e => e.id!== selectedEl.id) } : t); saveTemplates(newTemplates); setSelectedElId(""); } }} className="flex-1 h-7 rounded text-xs bg-red-600 text-white">Delete</button>
-              </div>
-              <div className="text-[10px] bg-green-50 p-2 rounded border">Real CODE128 barcode - full 52mm wide, blur proof scan.</div>
             </div>
           )}
         </div>
@@ -235,17 +223,11 @@ export default function LabelDesigner({ products }: { products: any[] }) {
 
       {contextMenu && (
         <div className="fixed bg-white border shadow-2xl rounded-lg p-2 z-[9999] w-64" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseLeave={() => setContextMenu(null)}>
-          <div className="text-[11px] font-bold mb-2 border-b pb-1">Field Select Karo - Jaise Azure/ZPL</div>
           {fieldOptions.map(opt => (
-            <button key={opt.value} className="w-full text-left text-xs px-3 py-2 hover:bg-black hover:text-white rounded flex justify-between" onClick={() => {
-              updateElement(contextMenu.elId, { dataSource: opt.value, field: opt.value });
-              setContextMenu(null);
-              toast.success(`${opt.label} set ho gaya`);
-            }}>
-              <span>{opt.label}</span><span className="text-[9px] opacity-60">{opt.value}</span>
+            <button key={opt.value} className="w-full text-left text-xs px-3 py-2 hover:bg-black hover:text-white rounded" onClick={() => { updateElement(contextMenu.elId, { dataSource: opt.value, field: opt.value }); setContextMenu(null); toast.success(`${opt.label} set`); }}>
+              {opt.label}
             </button>
           ))}
-          <button className="w-full text-left text-xs px-3 py-2 hover:bg-red-600 hover:text-white rounded mt-2 border-t" onClick={() => setContextMenu(null)}>Close</button>
         </div>
       )}
     </div>
