@@ -247,138 +247,183 @@ export default function Home() {
   };
 
   const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const numberValue = (value: unknown) => Number(String(value?? "").replace(/[^0-9.\-]/g, "")) || 0;
+  const numberValue = (value: unknown) => Number(String(value?? "").replace(/[^0-9.]/g, "")) || 0;
 
-  // ---- UNIVERSAL PARSER - HANDLES BOTH YOUR EXCELS ----
+  // ==================== UNIVERSAL PARSER - FIXED FOR CSV + XLSX ====================
+  // First row is ALWAYS treated as headers and shown in Mapped fields
   const parseWorkbook = (file: File) => {
+    const isCSV = file.name.toLowerCase().endsWith(".csv");
+
+    if (isCSV) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const text = String(event.target?.result || "");
+          const lines = text.split(/\r?\n/).filter((l) => l.trim()!== "");
+          if (!lines.length) {
+            toast.error("CSV is empty");
+            return;
+          }
+          const headers = lines[0].split(",").map((h) => h.trim());
+          // SHOW FIRST ROW IN MAPPED FIELDS - AS YOU ASKED
+          setMappedFields(headers);
+
+          const rows = lines.slice(1).map((line) => {
+            const cols = line.split(",");
+            const obj: Record<string, unknown> = {};
+            headers.forEach((h, i) => {
+              obj[normalizeHeader(h)] = cols[i]?.trim()?? "";
+            });
+            return obj;
+          });
+
+          const get = (row: Record<string, unknown>, keys: string[]) => {
+            for (const k of keys) {
+              const nk = normalizeHeader(k);
+              if (row[nk]!== undefined && String(row[nk]).trim()!== "") return row[nk];
+              const found = Object.keys(row).find((rk) => rk.includes(nk) || nk.includes(rk));
+              if (found && String(row[found]).trim()!== "") return row[found];
+            }
+            return "";
+          };
+
+          const mapped = rows
+           .map((row, index) => {
+              const name = get(row, ["pluname", "item name", "itemname", "product name", "name", "product", "item"]);
+              const code = get(row, ["plucode", "barcode", "item code", "code", "sku"]);
+              const price = get(row, ["unitprice", "price", "mrp", "rate"]);
+              const qty = get(row, ["qty", "quantity"]);
+              const plu = get(row, ["plu no", "plu number", "pluno", "plu"]);
+              const unit = get(row, ["uom", "unit"]);
+              const prodDate = get(row, ["production date", "packed date"]);
+              const expDate = get(row, ["usebydate", "expiry date"]);
+
+              const qtyNum = numberValue(qty) || 1;
+
+              return {
+                id: Date.now() + index,
+                name: String(name).trim() || `Product ${index + 1}`,
+                code: String(code).trim() || String(plu).trim() || `CODE${index + 1}`,
+                price: numberValue(price),
+                mrp: numberValue(price),
+                qty: qtyNum,
+                unit: String(unit || "pc").trim(),
+                plu: String(plu || "").trim(),
+                unitPrice: numberValue(price),
+                weight: 0,
+                totalPrice: numberValue(price),
+                packedDate: String(prodDate || "").trim(),
+                useByDate: String(expDate || "").trim(),
+                labelTemplate: labelMode === "pc"? "1" : "2",
+                extraFields: [],
+                copies: Math.max(1, Math.min(20, Math.floor(qtyNum) || 1)),
+              };
+            })
+           .filter((item) => item.name && item.code);
+
+          if (!mapped.length) {
+            toast.error(`We couldn't find product rows. Headers found: ${headers.join(", ")}`);
+            return;
+          }
+
+          setProducts(mapped);
+          toast.success(`${mapped.length} products imported from ${file.name}`);
+          setActiveSection("studio");
+        } catch (err) {
+          console.error(err);
+          toast.error("That file could not be read. Please upload a CSV or Excel file.");
+        }
+      };
+      reader.readAsText(file);
+      return;
+    }
+
+    // XLSX / XLS handling - also shows first row
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const workbook = XLSX.read(event.target?.result, { type: "array" });
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-
-        // Read as array of arrays to keep first row as header
         const rawData = XLSX.utils.sheet_to_json<any[]>(firstSheet, { header: 1, defval: "" }) as any[][];
+
         if (!rawData.length) {
-          toast.error("Excel is empty");
+          toast.error("We couldn't find product rows. Use Name, Price, and Code columns.");
           return;
         }
 
-        // Auto-detect header row - works for plu no / pluname / ITEM NAME / QTY etc
-        let headerRowIndex = 0;
+        let headerIdx = 0;
         for (let i = 0; i < Math.min(5, rawData.length); i++) {
           const joined = rawData[i].join(" ").toLowerCase();
           if (joined.includes("name") || joined.includes("plu") || joined.includes("barcode") || joined.includes("item") || joined.includes("qty") || joined.includes("code")) {
-            headerRowIndex = i;
+            headerIdx = i;
             break;
           }
         }
 
-        const originalHeaders = rawData[headerRowIndex].map((h: any) => String(h).trim()).filter((h: string) => h!== "");
-        const dataRows = rawData.slice(headerRowIndex + 1).filter((r) => r.some((c) => String(c).trim()!== ""));
+        const originalHeaders = rawData[headerIdx].map((h: any) => String(h).trim()).filter((h: string) => h!== "");
+        setMappedFields(originalHeaders);
 
-        // Build normalized rows
-        const normalizedRows = dataRows.map((r) => {
-          const obj: Record<string, unknown> = {};
-          originalHeaders.forEach((orig) => {
-            const realIdx = rawData[headerRowIndex].findIndex((h) => String(h).trim() === orig);
-            const normKey = normalizeHeader(orig);
-            obj[normKey] = r[realIdx];
-            obj[orig.toLowerCase()] = r[realIdx];
-          });
-          return obj;
-        });
+        const dataRows = rawData.slice(headerIdx + 1).filter((r) => r.some((c) => String(c).trim()!== ""));
 
-        const FIELD_MAP: Record<string, string[]> = {
-          name: ["itemname", "pluname", "productname", "name", "description", "particular", "item", "product", "title"],
-          code: ["barcode", "plucode", "productcode", "itemcode", "sku", "ean", "code"],
-          qty: ["qty", "quantity", "count", "pieces", "pcs"],
-          price: ["unitprice", "unit price", "price", "mrp", "rate", "sellingprice", "amount"],
-          plu: ["pluno", "plu no", "plu number", "plu"],
-          uom: ["uom", "unit", "measure", "uomname"],
-          label: ["labellinkno", "labelno", "label", "template", "labellink"],
-          prodDate: ["productiondate", "production date", "packeddate", "packed date", "mfgdate", "packingdate"],
-          expDate: ["expirydate", "expiry date", "usebydate", "use by date", "expdate", "bestbefore"],
-        };
-
-        const getByMap = (row: Record<string, unknown>, keys: string[]) => {
+        const get = (row: Record<string, unknown>, keys: string[]) => {
           for (const k of keys) {
             const nk = normalizeHeader(k);
             if (row[nk]!== undefined && String(row[nk]).trim()!== "") return row[nk];
             const found = Object.keys(row).find((rk) => rk.includes(nk) || nk.includes(rk));
             if (found && String(row[found]).trim()!== "") return row[found];
           }
-          return undefined;
+          return "";
         };
 
-        const detectedFields = new Set<string>(originalHeaders);
+        const mapped = dataRows
+         .map((r, index) => {
+            const obj: Record<string, unknown> = {};
+            originalHeaders.forEach((orig) => {
+              const realIdx = rawData[headerIdx].findIndex((h: any) => String(h).trim() === orig);
+              obj[normalizeHeader(orig)] = r[realIdx];
+            });
 
-        const mapped = normalizedRows
-         .map((entries, index) => {
-            const name = getByMap(entries, FIELD_MAP.name)?? "";
-            const code = getByMap(entries, FIELD_MAP.code)?? "";
-            const price = getByMap(entries, FIELD_MAP.price)?? 0;
-            const mrp = getByMap(entries, ["mrp", "max retail price"])?? price;
-            const qty = getByMap(entries, FIELD_MAP.qty)?? 1;
-            const unit = getByMap(entries, FIELD_MAP.uom)?? "pc";
-            const plu = getByMap(entries, FIELD_MAP.plu)?? "";
-            const unitPrice = getByMap(entries, FIELD_MAP.price)?? price;
-            const packedDate = getByMap(entries, FIELD_MAP.prodDate)?? "";
-            const useByDate = getByMap(entries, FIELD_MAP.expDate)?? "";
-            const labelTemplate = getByMap(entries, FIELD_MAP.label)?? (labelMode === "pc"? "1" : "2");
-
-            let finalName = String(name).trim();
-            if (!finalName) {
-              const firstText = Object.values(entries).find((v) => {
-                const s = String(v).trim();
-                return s.length > 2 && isNaN(Number(s));
-              });
-              if (firstText) finalName = String(firstText).trim();
-            }
-
-            let finalCode = String(code).trim();
-            if (!finalCode) finalCode = String(plu).trim() || `CODE${index + 1}`;
+            const name = get(obj, ["pluname", "item name", "itemname", "product name", "name"]);
+            const code = get(obj, ["plucode", "barcode", "code"]);
+            const price = get(obj, ["unitprice", "price", "mrp"]);
+            const qty = get(obj, ["qty", "quantity"]);
+            const plu = get(obj, ["plu no", "pluno", "plu"]);
+            const unit = get(obj, ["uom", "unit"]);
+            const prodDate = get(obj, ["production date", "packed date"]);
+            const expDate = get(obj, ["usebydate", "expiry date"]);
 
             const qtyNum = numberValue(qty) || 1;
 
-            const mappedAliases = Object.values(FIELD_MAP).flat().map(normalizeHeader);
-            const extraFields = Object.entries(entries)
-             .filter(([k, v]) =>!mappedAliases.some((m) => k.includes(m)) && String(v).trim()!== "" &&!k.includes(" "))
-             .slice(0, 3)
-             .map(([label, value]) => ({ label, value: String(value) }));
-
             return {
               id: Date.now() + index,
-              name: finalName || `Product ${index + 1}`,
-              code: finalCode,
+              name: String(name).trim() || `Product ${index + 1}`,
+              code: String(code).trim() || String(plu).trim() || `CODE${index + 1}`,
               price: numberValue(price),
-              mrp: numberValue(mrp || price),
+              mrp: numberValue(price),
               qty: qtyNum,
               unit: String(unit || "pc").trim(),
               plu: String(plu || "").trim(),
-              unitPrice: numberValue(unitPrice || price),
+              unitPrice: numberValue(price),
               weight: 0,
               totalPrice: numberValue(price),
-              packedDate: String(packedDate || "").trim(),
-              useByDate: String(useByDate || "").trim(),
-              labelTemplate: String(labelTemplate).trim(),
-              extraFields,
+              packedDate: String(prodDate || "").trim(),
+              useByDate: String(expDate || "").trim(),
+              labelTemplate: labelMode === "pc"? "1" : "2",
+              extraFields: [],
               copies: Math.max(1, Math.min(20, Math.floor(qtyNum) || 1)),
             };
           })
          .filter((item) => item.name && item.code);
 
         if (!mapped.length) {
-          toast.error(`We couldn't find product rows. Headers: ${originalHeaders.join(", ")}`);
+          toast.error("We couldn't find product rows. Use Name, Price, and Code columns.");
           return;
         }
 
         setProducts(mapped);
-        setMappedFields(Array.from(detectedFields));
         toast.success(`${mapped.length} products imported from ${file.name}`);
         setActiveSection("studio");
-      } catch (e) {
-        console.error(e);
+      } catch {
         toast.error("That file could not be read. Please upload a CSV or Excel file.");
       }
     };
@@ -503,7 +548,7 @@ export default function Home() {
         <div class="print-label__name">${product.name.replace(/[<>&]/g, "")}</div>
         <div class="print-label__price">₹${product.price.toLocaleString("en-IN")}</div>
         <svg class="print-barcode" data-value="${product.code.replace(/[^0-9A-Za-z]/g, "")}"></svg>
-        <div class="print-label__code">${product.code} | ${product.packedDate || ""} → ${product.useByDate || ""}</div>
+        <div class="print-label__code">${product.code} | PLU:${product.plu || "-"} | ${product.packedDate || ""}→${product.useByDate || ""}</div>
       </article>`)).join("");
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
@@ -598,7 +643,7 @@ export default function Home() {
           <div className="workspace-card">
             <div className="workspace-topline"><div className="workspace-title"><div className="workspace-icon"><LayoutGrid size={16} /></div><div><h3>{t.preview}</h3><p><span className="status-dot" />{uniqueCount} {t.rowsReady} · {labelCount} {t.labels.toLowerCase()}</p></div></div><div className="workspace-menu"><Badge className="badge-soft"><Sparkles size={13} /> Code-128</Badge><button className="icon-button" aria-label="More options"><MoreHorizontal size={20} /></button></div></div>
             <Separator />
-            {products.length? <div className="product-table-wrap"><table className="product-table"><thead><tr><th>QTY</th><th>{t.product}</th><th>{t.barcode}</th><th>{t.price}</th><th>{t.labels}</th><th><span className="sr-only">{t.action}</span></th></tr></thead><tbody>{products.map((product, index) => <tr key={product.id}><td><Badge variant="outline">{product.qty}</Badge></td><td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" aria-label={`${t.product} name`} /><span className="subtle-label">Label {product.labelTemplate || "1"} · {product.unit || "pc"} · PLU {product.plu || "-"} · {product.packedDate || ""}→{product.useByDate || ""}</span></div></div></td><td><div className="barcode-cell"><BarcodeMark value={product.code} compact /><Input value={product.code} onChange={(event) => updateProduct(product.id, "code", event.target.value)} className="table-input table-input--code" aria-label={`${t.barcode} value`} /></div></td><td><div className="price-input-wrap"><IndianRupee size={14} /><Input type="number" value={product.price} onChange={(event) => updateProduct(product.id, "price", Number(event.target.value))} className="table-input table-input--price" aria-label={`${t.price} value`} /></div></td><td><div className="copy-stepper"><button onClick={() => updateProduct(product.id, "copies", Math.max(1, product.copies - 1))} aria-label="Remove label"><Minus size={14} /></button><span>{product.copies}</span><button onClick={() => updateProduct(product.id, "copies", Math.min(20, product.copies + 1))} aria-label="Add label"><Plus size={14} /></button></div></td><td><button className="delete-button" onClick={() => { setProducts((current) => current.filter((item) => item.id!== product.id)); toast.success("Product removed"); }} aria-label={`Remove ${product.name}`}><X size={16} /></button></td></tr>)}</tbody></table></div> : <div className="empty-state"><div className="empty-state__icon"><Barcode size={26} /></div><h3>{t.emptyTitle}</h3><p>{t.emptyBody}</p></div>}
+            {products.length? <div className="product-table-wrap"><table className="product-table"><thead><tr><th>QTY</th><th>{t.product}</th><th>{t.barcode}</th><th>{t.price}</th><th>{t.labels}</th><th><span className="sr-only">{t.action}</span></th></tr></thead><tbody>{products.map((product, index) => <tr key={product.id}><td><Badge variant="outline">{product.qty}</Badge></td><td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" aria-label={`${t.product} name`} /><span className="subtle-label">Label {product.labelTemplate || "1"} · {product.unit || "pc"} · PLU {product.plu || "-"}</span></div></div></td><td><div className="barcode-cell"><BarcodeMark value={product.code} compact /><Input value={product.code} onChange={(event) => updateProduct(product.id, "code", event.target.value)} className="table-input table-input--code" aria-label={`${t.barcode} value`} /></div></td><td><div className="price-input-wrap"><IndianRupee size={14} /><Input type="number" value={product.price} onChange={(event) => updateProduct(product.id, "price", Number(event.target.value))} className="table-input table-input--price" aria-label={`${t.price} value`} /></div></td><td><div className="copy-stepper"><button onClick={() => updateProduct(product.id, "copies", Math.max(1, product.copies - 1))} aria-label="Remove label"><Minus size={14} /></button><span>{product.copies}</span><button onClick={() => updateProduct(product.id, "copies", Math.min(20, product.copies + 1))} aria-label="Add label"><Plus size={14} /></button></div></td><td><button className="delete-button" onClick={() => { setProducts((current) => current.filter((item) => item.id!== product.id)); toast.success("Product removed"); }} aria-label={`Remove ${product.name}`}><X size={16} /></button></td></tr>)}</tbody></table></div> : <div className="empty-state"><div className="empty-state__icon"><Barcode size={26} /></div><h3>{t.emptyTitle}</h3><p>{t.emptyBody}</p></div>}
             <div className="workspace-footer"><div className="footer-stats"><div><span className="stat-number">{uniqueCount}</span><span className="stat-label">{t.products}</span></div><div><span className="stat-number">{labelCount}</span><span className="stat-label">{t.labels}</span></div><div><span className="stat-number">A4</span><span className="stat-label">print size</span></div></div><div className="workspace-actions"><Button className="button button--outline" onClick={() => generatePDF(false)} disabled={!products.length}><Printer size={16} />{t.generate}</Button><Button className="button button--outline button--coral" onClick={exportPLU} disabled={!products.length}><Download size={16} />{t.export}</Button><Button className="button button--dark" onClick={() => generatePDF(true)} disabled={!products.length}><BadgeIndianRupee size={16} />{t.sticker}</Button></div></div>
           </div>
           <div className="studio-caption"><ShieldCheck size={15} /><span>Your files stay in your browser. Nothing is uploaded to a server.</span></div>
