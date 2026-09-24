@@ -871,20 +871,22 @@ export default function Home() {
               <Button size="sm" variant="outline" onClick={() => setShowPreview(false)}>X</Button>
             </div>
             <div className="bg-gray-200 p-6 rounded flex justify-center items-center">
-              <div className="bg-white border-2 border-black shadow-lg relative overflow-hidden" style={{ width: (printSetting.orientation === "portrait"? printSetting.width : printSetting.height) * 3.78 + "px", height: (printSetting.orientation === "portrait"? printSetting.height : printSetting.width) * 3.78 + "px" }}>
+                           <div className="bg-white border-2 border-black shadow-lg relative overflow-hidden" style={{ width: (printSetting.orientation === "portrait"? printSetting.width : printSetting.height) * 3.78 + "px", height: (printSetting.orientation === "portrait"? printSetting.height : printSetting.width) * 3.78 + "px" }}>
                 <div className="absolute inset-0 p-1.5 flex flex-col justify-between">
                   <div className="font-bold text-center leading-tight truncate" style={{ fontSize: "9px" }}>{filteredProducts[previewIdx].name}</div>
                   <div className="flex justify-center bg-white py-1"><BarcodeMark value={filteredProducts[previewIdx].code} /></div>
-                  <div className="text-center font-mono" style={{ fontSize: "6px", letterSpacing: "0.5px" }}>{filteredProducts[previewIdx].code}</div>
-                  <div className="grid grid-cols-3 gap-1" style={{ fontSize: "6px" }}>
+                  <div className="text-center font-mono" style={{ fontSize: "6px" }}>{filteredProducts[previewIdx].code}</div>
+                  <div className="grid grid-cols-3 gap-1 border-t border-gray-100 pt-1" style={{ fontSize: "6px" }}>
                     <div>Packed: {filteredProducts[previewIdx].packedDate}</div>
-                    <div className="text-center">{activeTab === "store"? `UOM: ${filteredProducts[previewIdx].unit}` : `QTY: ${filteredProducts[previewIdx].qty}`}</div>
+                    <div className="text-center font-bold">
+                      {filteredProducts[previewIdx].unit === "PC" || String(filteredProducts[previewIdx].labelTemplate) === "1"? "UOM: PC" : "UOM: WT"}
+                    </div>
                     <div className="text-right">Exp: {filteredProducts[previewIdx].useByDate}</div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 font-bold" style={{ fontSize: "7px" }}>
-                    <div>CDF {filteredProducts[previewIdx].unitPrice || filteredProducts[previewIdx].price}</div>
-                    <div className="text-center">{activeTab === "store"? `${filteredProducts[previewIdx].expiryDays} Days` : `Qty ${filteredProducts[previewIdx].qty}`}</div>
-                    <div className="text-right">CDF {filteredProducts[previewIdx].totalPrice || filteredProducts[previewIdx].price}</div>
+                  <div className="grid grid-cols-3 gap-1 font-bold bg-gray-50 -mx-1.5 px-1.5 py-1 mt-1" style={{ fontSize: "7px" }}>
+                    <div>Link: {filteredProducts[previewIdx].labelTemplate} {String(filteredProducts[previewIdx].labelTemplate) === "1"? "PC" : "WT"}</div>
+                    <div className="text-center">{filteredProducts[previewIdx].expiryDays} Days</div>
+                    <div className="text-right text-[9px]">CDF {filteredProducts[previewIdx].unitPrice || filteredProducts[previewIdx].price}</div>
                   </div>
                 </div>
               </div>
