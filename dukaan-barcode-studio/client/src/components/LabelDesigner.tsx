@@ -227,4 +227,7 @@ export default function LabelDesigner({ products }: { products: DesignerProduct[
         <div className="inspector-footer"><Button className="button button--dark button--full" onClick={printTemplate} disabled={!products.length}><Printer size={15} />Print selected label</Button><span><FileJson size={13} />Saved locally</span></div>
       </aside>
     </div>
- 
+     </section>
+  );
+}
+
