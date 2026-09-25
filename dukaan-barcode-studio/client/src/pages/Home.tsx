@@ -46,6 +46,7 @@ interface Product {
   price: number;
   mrp?: number;
   qty?: number;
+  packSize?: string;
   unit?: string;
   plu?: string;
   unitPrice?: number;
@@ -163,6 +164,7 @@ const copy = {
 function formatPrice(price: number) {
   return `₹${price.toLocaleString("en-IN")}`;
 }
+
 function downloadBlob(content: string, filename: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -174,6 +176,7 @@ function downloadBlob(content: string, filename: string, type: string) {
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+
 function BarcodeMark({ value, compact = false }: { value: string; compact?: boolean }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   useEffect(() => {
@@ -193,6 +196,7 @@ function BarcodeMark({ value, compact = false }: { value: string; compact?: bool
   }, [value, compact]);
   return <svg ref={svgRef} className={compact? "barcode-svg barcode-svg--compact" : "barcode-svg"} aria-label={`Barcode ${value}`} />;
 }
+
 function Logo() {
   return (
     <div className="brand-lockup">
@@ -209,6 +213,7 @@ function Logo() {
     </div>
   );
 }
+
 function SectionKicker({ children, tone = "lime" }: { children: ReactNode; tone?: "lime" | "coral" }) {
   return (
     <div className={`section-kicker section-kicker--${tone}`}>
@@ -217,6 +222,7 @@ function SectionKicker({ children, tone = "lime" }: { children: ReactNode; tone?
     </div>
   );
 }
+
 function StepCard({ number, icon: Icon, title, body }: { number: string; icon: typeof Upload; title: string; body: string }) {
   return (
     <div className="step-card">
@@ -329,7 +335,7 @@ export default function Home() {
           };
           const today = new Date();
           const mapped = rows
-         .map((row, index) => {
+           .map((row, index) => {
               const name = get(row, ["pluname", "item name", "itemname", "product name", "name"]);
               const code = get(row, ["plucode", "barcode", "item code", "code", "sku"]);
               const price = get(row, ["unitprice", "price", "mrp", "rate"]);
@@ -349,6 +355,7 @@ export default function Home() {
                 price: numberValue(price),
                 mrp: numberValue(price),
                 qty: 1,
+                packSize: "1 PCS",
                 unit: uom,
                 plu: String(plu || "").trim(),
                 unitPrice: numberValue(price),
@@ -363,7 +370,7 @@ export default function Home() {
                 type: "store" as const,
               };
             })
-         .filter((item) => item.name && item.code);
+           .filter((item) => item.name && item.code);
           setStoreProducts(mapped);
           if (activeTab === "store") setProducts(mapped);
           try {
@@ -372,7 +379,8 @@ export default function Home() {
             const newTemplate = {
               id: "auto-store-" + Date.now(),
               name: `STORE Auto ${mapped.length} items`,
-              width: 54, height: 37,
+              width: 54,
+              height: 37,
               elements: [
                 { id: "e1", type: "text", x: 2, y: 2, width: 50, height: 5, field: "name", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
                 { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 17, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
@@ -422,7 +430,7 @@ export default function Home() {
         setMappedFields(originalHeaders);
         const dataRows = rawData.slice(headerIdx + 1).filter((r) => r.some((c) => String(c).trim()!== ""));
         const mapped = dataRows
-       .map((r, index) => {
+         .map((r, index) => {
             const obj: Record<string, unknown> = {};
             originalHeaders.forEach((orig) => {
               const realIdx = rawData[headerIdx].findIndex((h: any) => String(h).trim() === orig);
@@ -439,9 +447,10 @@ export default function Home() {
             };
             const name = get(obj, ["item name", "name"]);
             const code = get(obj, ["barcode", "code"]);
-            const qty = get(obj, ["qty", "quantity"]);
-            const prod = get(obj, ["production date", "packed date"]);
-            const exp = get(obj, ["expiry date", "usebydate"]);
+            const qty = get(obj, ["qty", "quantity", "print qty", "print", "copies"]);
+            const packSizeRaw = get(obj, ["pack size", "packsize", "pack", "pcs", "pc", "wt", "weight", "gram", "kg", "size"]);
+            const prod = get(obj, ["production date", "packed date", "prod date"]);
+            const exp = get(obj, ["expiry date", "usebydate", "exp date"]);
             const parseDate = (d: any) => {
               if (!d) return new Date().toLocaleDateString("en-GB");
               if (typeof d === 'number') {
@@ -462,6 +471,7 @@ export default function Home() {
               price: 0,
               mrp: 0,
               qty: numberValue(qty) || 1,
+              packSize: String(packSizeRaw).trim() || "1 PCS",
               unit: "PC",
               plu: String(code).trim(),
               unitPrice: 0,
@@ -476,30 +486,31 @@ export default function Home() {
               type: "production" as const,
             };
           })
-       .filter((item) => item.name && item.code);
+         .filter((item) => item.name && item.code);
         setProdProducts(mapped);
         if (activeTab === "production") setProducts(mapped);
-          try {
-            const key = "dukaan-label-templates-v2";
-            const existing = JSON.parse(localStorage.getItem(key) || "[]");
-            const newTemplate = {
-              id: "auto-prod-" + Date.now(),
-              name: `PRODUCTION Auto ${mapped.length} items`,
-              width: 54, height: 37,
-              elements: [
-                { id: "e1", type: "text", x: 2, y: 1, width: 50, height: 5, field: "itemname", dataSource: "name", fontSize: 7, bold: true, color: "#000", align: "center", text: "" },
-                { id: "e2", type: "barcode", x: 5, y: 6, width: 44, height: 17, field: "barcode", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
-                { id: "e3", type: "text", x: 2, y: 26, width: 16, height: 3, field: "productiondate", dataSource: "packeddate", fontSize: 4.5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Prod: {{value}}" },
-                { id: "e4", type: "text", x: 36, y: 26, width: 16, height: 3, field: "expirydate", dataSource: "usebydate", fontSize: 4.5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
-                { id: "e5", type: "text", x: 2, y: 30, width: 50, height: 5, field: "qty", dataSource: "qty", fontSize: 9, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}} PCS" },
-              ]
-            };
-            const filtered = existing.filter((t:any)=>!t.id.startsWith("auto-"));
-            filtered.unshift(newTemplate);
-            localStorage.setItem(key, JSON.stringify(filtered));
-            localStorage.removeItem("dukaan-label-templates-v1");
-            window.dispatchEvent(new Event("templates-updated"));
-          } catch {}
+        try {
+          const key = "dukaan-label-templates-v2";
+          const existing = JSON.parse(localStorage.getItem(key) || "[]");
+          const newTemplate = {
+            id: "auto-prod-" + Date.now(),
+            name: `PRODUCTION Auto ${mapped.length} items`,
+            width: 54,
+            height: 37,
+            elements: [
+              { id: "e1", type: "text", x: 2, y: 1, width: 50, height: 5, field: "itemname", dataSource: "name", fontSize: 7, bold: true, color: "#000", align: "center", text: "" },
+              { id: "e2", type: "barcode", x: 5, y: 6, width: 44, height: 17, field: "barcode", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
+              { id: "e3", type: "text", x: 2, y: 26, width: 16, height: 3, field: "productiondate", dataSource: "packeddate", fontSize: 4.5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Prod: {{value}}" },
+              { id: "e4", type: "text", x: 36, y: 26, width: 16, height: 3, field: "expirydate", dataSource: "usebydate", fontSize: 4.5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
+              { id: "e5", type: "text", x: 2, y: 30, width: 50, height: 5, field: "packsize", dataSource: "packsize", fontSize: 10, bold: true, color: "#000", align: "center", text: "", displayFormat: "{{value}}" },
+            ]
+          };
+          const filtered = existing.filter((t:any)=>!t.id.startsWith("auto-"));
+          filtered.unshift(newTemplate);
+          localStorage.setItem(key, JSON.stringify(filtered));
+          localStorage.removeItem("dukaan-label-templates-v1");
+          window.dispatchEvent(new Event("templates-updated"));
+        } catch {}
         toast.success(`${mapped.length} PRODUCTION products imported`);
         setActiveSection("studio");
       } catch {
@@ -518,10 +529,12 @@ export default function Home() {
     }
     parseWorkbook(file);
   };
+
   const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
     handleFile(event.target.files?.[0]);
     event.target.value = "";
   };
+
   const filteredProducts = useMemo(() => {
     let list = products;
     if (activeTab === "store" && selectedType!== "all") list = list.filter((p) => (p.labelTemplate || "1") === selectedType);
@@ -536,7 +549,7 @@ export default function Home() {
     }
     const rows = [
       ["PLU No", "Barcode", "Name", "Price"],
-   ...products.map((product, index) => [product.plu || String(index + 1).padStart(4, "0"), product.code, `"${product.name.replaceAll('"', '""')}"`, product.price.toFixed(2)]),
+     ...products.map((product, index) => [product.plu || String(index + 1).padStart(4, "0"), product.code, `"${product.name.replaceAll('"', '""')}"`, product.price.toFixed(2)]),
     ];
     downloadBlob(rows.map((row) => row.join(",")).join("\n"), "dukaan-essae-plu.csv", "text/csv;charset=utf-8");
     toast.success("Essae PLU CSV exported");
@@ -569,7 +582,7 @@ export default function Home() {
         return;
       }
     }
-    const items = baseList.flatMap((p) => Array.from({ length: (p.copies || 1) * (activeTab === "production"? p.qty || 1 : 1) }, () => p));
+    const items = baseList.flatMap((p) => Array.from({ length: (p.copies || 1) * (p.qty || 1) }, () => p));
 
     const pdf = new jsPDF({
       orientation: "landscape",
@@ -591,11 +604,11 @@ export default function Home() {
         if (el.type === "static") v = el.text || "";
         else {
           if (activeTab === "store") {
-            const map: any = { name: p.name, code: p.code, plu: p.plu, price: Math.round(p.price).toString(), unitprice: Math.round(p.unitPrice || p.price).toString(), packeddate: p.packedDate, usebydate: p.useByDate, expiry: (p.expiryDays || 3) + " Days", uom: p.unit, qty: String(p.qty || 1) };
+            const map: any = { name: p.name, code: p.code, plu: p.plu, price: Math.round(p.price).toString(), unitprice: Math.round(p.unitPrice || p.price).toString(), packeddate: p.packedDate, usebydate: p.useByDate, expiry: (p.expiryDays || 3) + " Days", uom: p.unit, qty: String(p.qty || 1), packsize: (p as any).packSize || "1 PCS" };
             v = map[k] || "";
             if (k.indexOf("price") >= 0 && v) v = "CDF " + v;
           } else {
-            const map: any = { name: p.name, code: p.code, barcode: p.code, plu: p.plu, qty: String(p.qty || 1), itemname: p.name, productiondate: p.packedDate, expirydate: p.useByDate, packeddate: p.packedDate, usebydate: p.useByDate };
+            const map: any = { name: p.name, code: p.code, barcode: p.code, plu: p.plu, qty: String(p.qty || 1), packsize: String((p as any).packSize || "1 PCS"), itemname: p.name, productiondate: p.packedDate, expirydate: p.useByDate, packeddate: p.packedDate, usebydate: p.useByDate };
             v = map[k] || "";
           }
           if (el.displayFormat) v = el.displayFormat.replace("{{value}}", v);
@@ -834,15 +847,15 @@ export default function Home() {
             <Button onClick={() => { setActiveTab("store"); setProducts(storeProducts); }} className={activeTab === "store"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"} title="STORE CSV: plu no,pluname,plucode,uom,unitprice,labellinkno,usebydate">
               <Store size={14} /> STORE ({storeProducts.length})
             </Button>
-            <Button onClick={() => { setActiveTab("production"); setProducts(prodProducts); }} className={activeTab === "production"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"} title="PRODUCTION XLSX: QTY, ITEM NAME, BARCODE, Production Date, Expiry Date">
+            <Button onClick={() => { setActiveTab("production"); setProducts(prodProducts); }} className={activeTab === "production"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"} title="PRODUCTION XLSX: QTY, ITEM NAME, BARCODE, PACK SIZE, Production Date, Expiry Date">
               <Factory size={14} /> PRODUCTION ({prodProducts.length})
             </Button>
             <div className="ml-auto flex gap-2 items-center flex-wrap">
-              <Badge variant="outline" className="text-[10px]">54x37 Thermal - No Cut</Badge>
+              <Badge variant="outline" className="text-[10px]">54x37 Thermal - No Cut - QTY=Print</Badge>
               <Badge className={activeTab === "store"? "bg-green-600 text-[10px]" : "bg-orange-600 text-[10px]"}>{activeTab.toUpperCase()}</Badge>
             </div>
             <div className="w-full text-[9px] text-gray-400 mt-1 hidden md:block">
-              {activeTab === "store"? "STORE fields: plu no, pluname, plucode, uom (0=PC/1=GRM), unitprice, labellinkno, usebydate (days)" : "PRODUCTION fields: QTY, ITEM NAME, BARCODE, Production Date, Expiry Date"}
+              {activeTab === "store"? "STORE fields: plu no, pluname, plucode, uom (0=PC/1=GRM), unitprice, labellinkno, usebydate (days)" : "PRODUCTION NEW: QTY=Print Count (15), PACK SIZE=Label pe (2 PCS / 10 PCS / 500 GRM), ITEM NAME, BARCODE, Production Date, Expiry Date"}
             </div>
           </div>
 
@@ -853,14 +866,14 @@ export default function Home() {
             </div>
             <div className="upload-copy">
               <strong>{isDragging? "Drop it here" : `Drag & drop your ${activeTab.toUpperCase()} file here`}</strong>
-              <span>{activeTab === "store"? "STORE CSV: plu no, pluname, plucode, uom (0=PC/1=GRM), unitprice, labellinkno, usebydate (days) - Expiry auto calculate" : "PRODUCTION XLSX: QTY, ITEM NAME, BARCODE, Production Date, Expiry Date - Qty ke hisab se copies"}</span>
+              <span>{activeTab === "store"? "STORE CSV: plu no, pluname, plucode, uom (0=PC/1=GRM), unitprice, labellinkno, usebydate (days)" : "PRODUCTION: QTY=Kitne Print (15), PACK SIZE=Kitne PC/GRM (2 PCS), ITEM NAME, BARCODE, Production Date, Expiry Date"}</span>
             </div>
             <div className="upload-actions">
               <Button className="button button--dark" onClick={() => fileRef.current?.click()}>
                 <Upload size={16} />
                 {t.browse} {activeTab}
               </Button>
-              <span className="free-usage-note">Thermal 54x37 - No Cut - Preview Before Print</span>
+              <span className="free-usage-note">QTY = Print Count, PACK SIZE = Label</span>
             </div>
           </div>
 
@@ -893,7 +906,7 @@ export default function Home() {
               <div className="relative"><Search size={12} className="absolute left-2 top-2.5 text-gray-400" /><Input placeholder="Search PLU / Name / Barcode" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-48 text-xs pl-6" /></div>
               {activeTab === "store" && (<select value={selectedType} onChange={(e) => setSelectedType(e.target.value as any)} className="border rounded h-8 px-2 text-xs"><option value="all">All</option><option value="1">PC Link1</option><option value="2">WT Link2</option></select>)}
               <Badge variant="outline">{filteredProducts.length} filtered</Badge>
-              <Badge className="bg-blue-600 text-white">Total Copies: {filteredProducts.reduce((a, b) => a + (b.copies || 1) * (activeTab === "production"? b.qty || 1 : 1), 0)}</Badge>
+              <Badge className="bg-blue-600 text-white">Total Prints: {filteredProducts.reduce((a, b) => a + (b.copies || 1) * (b.qty || 1), 0)} (QTY=Print)</Badge>
             </div>
           </div>
 
@@ -903,31 +916,31 @@ export default function Home() {
                 <div className="workspace-icon"><LayoutGrid size={16} /></div>
                 <div><h3>{t.preview} - {activeTab.toUpperCase()} - {filteredProducts.length} items</h3><p><span className="status-dot" />{uniqueCount} {t.rowsReady} · {labelCount} {t.labels.toLowerCase()} · {printSetting.width}x{printSetting.height}mm {printSetting.orientation}</p></div>
               </div>
-              <div className="workspace-menu"><Badge className="badge-soft"><Sparkles size={13} /> Code-128 - Thermal No Cut - 2 Tabs</Badge><button className="icon-button" aria-label="More options"><MoreHorizontal size={20} /></button></div>
+              <div className="workspace-menu"><Badge className="badge-soft"><Sparkles size={13} /> QTY = Print Count</Badge><button className="icon-button" aria-label="More options"><MoreHorizontal size={20} /></button></div>
             </div>
             <Separator />
             {filteredProducts.length? (
               <div className="product-table-wrap">
                 <table className="product-table">
-                  <thead><tr><th><input type="checkbox" checked={selectedIds.size===filteredProducts.length && filteredProducts.length>0} onChange={(e) => { if(e.target.checked) setSelectedIds(new Set(filteredProducts.map(p=>p.id))); else setSelectedIds(new Set()); }} /></th><th>QTY</th><th>{t.product}</th><th>{t.barcode}</th><th>{t.price}</th><th>{t.labels}</th><th>Preview</th><th><span className="sr-only">{t.action}</span></th></tr></thead>
+                  <thead><tr><th><input type="checkbox" checked={selectedIds.size===filteredProducts.length && filteredProducts.length>0} onChange={(e) => { if(e.target.checked) setSelectedIds(new Set(filteredProducts.map(p=>p.id))); else setSelectedIds(new Set()); }} /></th><th>Print QTY</th><th>{t.product}</th><th>{t.barcode}</th><th>PACK SIZE</th><th>{t.labels}</th><th>Preview</th><th><span className="sr-only">{t.action}</span></th></tr></thead>
                   <tbody>
                     {filteredProducts.slice(0, 300).map((product, index) => (
                       <tr key={product.id}>
                         <td><input type="checkbox" checked={selectedIds.has(product.id)} onChange={(e) => { const s = new Set(selectedIds); if(e.target.checked) s.add(product.id); else s.delete(product.id); setSelectedIds(s); }} /></td>
-                        <td><Badge variant="outline">{activeTab === "production"? product.qty : 1}</Badge></td>
-                        <td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" aria-label={`${t.product} name`} /><span className="subtle-label">Label {product.labelTemplate || "1"} · {product.unit || "pc"} · PLU {product.plu || "-"} · {activeTab === "store"? `${product.expiryDays} Days` : `${product.packedDate}→${product.useByDate}`}</span></div></div></td>
-                        <td><div className="barcode-cell"><BarcodeMark value={product.code} compact /><Input value={product.code} onChange={(event) => updateProduct(product.id, "code", event.target.value)} className="table-input table-input--code" aria-label={`${t.barcode} value`} /></div></td>
-                        <td><div className="price-input-wrap"><IndianRupee size={14} /><Input type="number" value={product.price || product.unitPrice || 0} onChange={(event) => updateProduct(product.id, "price", Number(event.target.value))} className="table-input table-input--price" aria-label={`${t.price} value`} /></div></td>
-                        <td><div className="copy-stepper"><button onClick={() => updateProduct(product.id, "copies", Math.max(1, product.copies - 1))} aria-label="Remove label"><Minus size={14} /></button><span>{product.copies}</span><button onClick={() => updateProduct(product.id, "copies", Math.min(20, product.copies + 1))} aria-label="Add label"><Plus size={14} /></button></div></td>
+                        <td><Badge variant="outline" className="bg-green-100">{product.qty} Prints</Badge></td>
+                        <td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" /><span className="subtle-label">Pack: {(product as any).packSize || "1 PCS"} · PLU {product.plu || "-"} · {product.packedDate}→{product.useByDate}</span></div></div></td>
+                        <td><div className="barcode-cell"><BarcodeMark value={product.code} compact /><Input value={product.code} onChange={(event) => updateProduct(product.id, "code", event.target.value)} className="table-input table-input--code" /></div></td>
+                        <td><Input value={(product as any).packSize || "1 PCS"} onChange={(event) => updateProduct(product.id, "packSize" as any, event.target.value)} className="table-input table-input--price w-20" /></td>
+                        <td><div className="copy-stepper"><button onClick={() => updateProduct(product.id, "copies", Math.max(1, product.copies - 1))}><Minus size={14} /></button><span>{product.copies}</span><button onClick={() => updateProduct(product.id, "copies", Math.min(20, product.copies + 1))}><Plus size={14} /></button></div></td>
                         <td><Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => { setPreviewIdx(index); setShowPreview(true); }}><Eye size={12} /> View</Button></td>
-                        <td><button className="delete-button" onClick={() => { if (activeTab === "store") { setStoreProducts((current) => current.filter((item) => item.id!== product.id)); setProducts((current) => current.filter((item) => item.id!== product.id)); } else { setProdProducts((current) => current.filter((item) => item.id!== product.id)); setProducts((current) => current.filter((item) => item.id!== product.id)); } toast.success("Product removed"); }} aria-label={`Remove ${product.name}`}><X size={16} /></button></td>
+                        <td><button className="delete-button" onClick={() => { if (activeTab === "store") { setStoreProducts((current) => current.filter((item) => item.id!== product.id)); setProducts((current) => current.filter((item) => item.id!== product.id)); } else { setProdProducts((current) => current.filter((item) => item.id!== product.id)); setProducts((current) => current.filter((item) => item.id!== product.id)); } toast.success("Product removed"); }}><X size={16} /></button></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             ) : (
-              <div className="empty-state"><div className="empty-state__icon"><Barcode size={26} /></div><h3>{t.emptyTitle} - {activeTab.toUpperCase()}</h3><p>{activeTab === "store"? "Upload STORE CSV: plu no,pluname,plucode,uom,unitprice,labellinkno,usebydate" : "Upload PRODUCTION XLSX: QTY, ITEM NAME, BARCODE, Production Date, Expiry Date"}</p></div>
+              <div className="empty-state"><div className="empty-state__icon"><Barcode size={26} /></div><h3>{t.emptyTitle} - {activeTab.toUpperCase()}</h3><p>NEW: QTY=Kitne Print, PACK SIZE=Kitne PC/GRM, ITEM NAME, BARCODE, Production Date, Expiry Date</p></div>
             )}
             <div className="workspace-footer">
               <div className="footer-stats"><div><span className="stat-number">{uniqueCount}</span><span className="stat-label">{t.products}</span></div><div><span className="stat-number">{labelCount}</span><span className="stat-label">{t.labels}</span></div><div><span className="stat-number">{printSetting.width}x{printSetting.height}</span><span className="stat-label">{printSetting.orientation}</span></div></div>
@@ -940,7 +953,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="studio-caption"><ShieldCheck size={15} /><span>Your files stay in your browser. Nothing is uploaded to a server. Thermal 54x37 - No Cut - Preview Before Print - Resizable - Horizontal/Vertical - Same label design</span></div>
         </section>
 
         <LabelDesigner products={products} />
@@ -948,7 +960,6 @@ export default function Home() {
         <section id="guide" className="guide-section anchor-section">
           <div className="guide-heading"><div><SectionKicker>{t.navGuide}</SectionKicker><h2>{t.workflowTitle}</h2></div><p>{t.workflowBody}</p></div>
           <div className="steps-grid"><StepCard number="01" icon={CloudUpload} title={t.step1} body={t.step1Body} /><StepCard number="02" icon={LayoutGrid} title={t.step2} body={t.step2Body} /><StepCard number="03" icon={Printer} title={t.step3} body={t.step3Body} /></div>
-          <div className="guide-callout"><div className="callout-icon"><CircleHelp size={19} /></div><div><strong>Store + Production 2 Tabs - Same Label 54x37 - Preview Verify - No Cut</strong><p>STORE: plu no,pluname,plucode,uom,unitprice,labellinkno,usebydate (days) - PRODUCTION: QTY, ITEM NAME, BARCODE, Production Date, Expiry Date - Label Setting at Print Time - Width/Height Resizable - Horizontal/Vertical</p></div><span className="callout-link">Free for everyone</span></div>
         </section>
       </main>
 
@@ -956,56 +967,27 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-3" onClick={() => setShowPreview(false)}>
           <div className="bg-white rounded-xl p-4 w-full max-w-[540px]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-3">
-              <b className="text-[11px] leading-tight">PREVIEW VERIFY - {activeTab.toUpperCase()} - Actual {printSetting.width}x{printSetting.height}mm {printSetting.orientation}</b>
+              <b className="text-[11px]">PREVIEW - QTY={filteredProducts[previewIdx].qty} Prints, PACK={(filteredProducts[previewIdx] as any).packSize}</b>
               <Button size="sm" variant="outline" onClick={() => setShowPreview(false)}>X</Button>
             </div>
-
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mb-3 flex gap-3 flex-wrap">
-              <label className="flex items-center gap-1 text-[11px] cursor-pointer font-bold">
-                <input type="radio" name="scope" checked={printScope==="single"} onChange={() => setPrintScope("single")} />
-                <span>Single Only - {filteredProducts[previewIdx]?.name.slice(0,20)} ({filteredProducts[previewIdx]?.code})</span>
-              </label>
-              <label className="flex items-center gap-1 text-[11px] cursor-pointer">
-                <input type="radio" name="scope" checked={printScope==="all"} onChange={() => setPrintScope("all")} />
-                <span>All {filteredProducts.length} Items</span>
-              </label>
-              <label className="flex items-center gap-1 text-[11px] cursor-pointer">
-                <input type="radio" name="scope" checked={printScope==="selected"} onChange={() => setPrintScope("selected")} />
-                <span>Selected ({selectedIds.size}) Only</span>
-              </label>
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer font-bold"><input type="radio" name="scope" checked={printScope==="single"} onChange={() => setPrintScope("single")} /><span>Single Only</span></label>
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer"><input type="radio" name="scope" checked={printScope==="all"} onChange={() => setPrintScope("all")} /><span>All {filteredProducts.length} Items</span></label>
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer"><input type="radio" name="scope" checked={printScope==="selected"} onChange={() => setPrintScope("selected")} /><span>Selected ({selectedIds.size})</span></label>
             </div>
-
             <div className="bg-gray-200 p-6 rounded flex justify-center items-center">
-                           <div className="bg-white border-2 border-black shadow-lg relative overflow-hidden" style={{ width: (printSetting.orientation === "portrait"? printSetting.width : printSetting.height) * 3.78 + "px", height: (printSetting.orientation === "portrait"? printSetting.height : printSetting.width) * 3.78 + "px" }}>
+              <div className="bg-white border-2 border-black shadow-lg relative overflow-hidden" style={{ width: (printSetting.orientation === "portrait"? printSetting.width : printSetting.height) * 3.78 + "px", height: (printSetting.orientation === "portrait"? printSetting.height : printSetting.width) * 3.78 + "px" }}>
                 <div className="absolute inset-0 p-1.5 flex flex-col justify-between">
                   <div className="font-bold text-center leading-tight truncate" style={{ fontSize: "9px" }}>{filteredProducts[previewIdx].name}</div>
                   <div className="flex justify-center bg-white py-1"><BarcodeMark value={filteredProducts[previewIdx].code} /></div>
                   <div className="text-center font-mono" style={{ fontSize: "6px" }}>{filteredProducts[previewIdx].code}</div>
-                  <div className="grid grid-cols-3 gap-1 border-t border-gray-100 pt-1" style={{ fontSize: "6px" }}>
-                    <div>Packed: {filteredProducts[previewIdx].packedDate}</div>
-                    <div className="text-center font-bold">
-                      {filteredProducts[previewIdx].unit === "PC" || String(filteredProducts[previewIdx].labelTemplate) === "1"? "UOM: PC" : "UOM: WT"}
-                    </div>
-                    <div className="text-right">Exp: {filteredProducts[previewIdx].useByDate}</div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 font-bold bg-gray-50 -mx-1.5 px-1.5 py-1 mt-1" style={{ fontSize: "7px" }}>
-                    <div>Link: {filteredProducts[previewIdx].labelTemplate} {String(filteredProducts[previewIdx].labelTemplate) === "1"? "PC" : "WT"}</div>
-                    <div className="text-center">{filteredProducts[previewIdx].expiryDays} Days</div>
-                    {activeTab==="store"? (
-                      <div className="text-right text-[9px]">CDF {filteredProducts[previewIdx].unitPrice || filteredProducts[previewIdx].price}</div>
-                    ) : (
-                      <div className="text-right text-[9px] font-bold">QTY: {filteredProducts[previewIdx].qty} PCS</div>
-                    )}
-                  </div>
+                  <div className="grid grid-cols-2 gap-1 border-t border-gray-100 pt-1" style={{ fontSize: "6px" }}><div>Prod: {filteredProducts[previewIdx].packedDate}</div><div className="text-right">Exp: {filteredProducts[previewIdx].useByDate}</div></div>
+                  <div className="font-bold bg-gray-50 -mx-1.5 px-1.5 py-1 mt-1 text-center" style={{ fontSize: "10px" }}>{(filteredProducts[previewIdx] as any).packSize || "1 PCS"}</div>
                 </div>
               </div>
             </div>
-            <div className="mt-3 text-[10px] bg-gray-50 p-2 rounded border">
-              <div>Product: <b>{filteredProducts[previewIdx].name}</b> - Actual {printSetting.width}x{printSetting.height}mm - Scope: {printScope}</div>
-              <div className="text-[9px] text-gray-600 mt-1">Code: {filteredProducts[previewIdx].code} | {activeTab === "store"? `PLU ${filteredProducts[previewIdx].plu} | ${filteredProducts[previewIdx].unit} | Link ${filteredProducts[previewIdx].labelTemplate} | ${filteredProducts[previewIdx].expiryDays} Days` : `Qty ${filteredProducts[previewIdx].qty} | Prod ${filteredProducts[previewIdx].packedDate} | Exp ${filteredProducts[previewIdx].useByDate}`}</div>
-            </div>
             <div className="flex gap-2 mt-3">
-              <Button className="flex-1 bg-green-600 text-white h-10" onClick={() => { setShowPreview(false); setTimeout(() => printThermalFromDesigner(), 200); }}><Printer size={14} /> Print {printScope.toUpperCase()} - {printScope==="single"? "1": printScope==="selected"? selectedIds.size : filteredProducts.length} Labels</Button>
+              <Button className="flex-1 bg-green-600 text-white h-10" onClick={() => { setShowPreview(false); setTimeout(() => printThermalFromDesigner(), 200); }}><Printer size={14} /> Print {printScope.toUpperCase()}</Button>
               <Button variant="outline" className="flex-1 h-10" onClick={() => setShowPreview(false)}>Edit Karo</Button>
             </div>
           </div>
@@ -1013,7 +995,7 @@ export default function Home() {
       )}
 
       <footer className="footer">
-        <div className="footer-inner"><Logo /><span>{t.footer}</span><span className="developer-credit">Developed by <strong>Aditya Softwares</strong> - Store + Production Tabs - 54x37 Thermal - Preview Verify</span><div className="footer-links"><button onClick={() => toast.info("Dukaan Barcode Studio keeps your data local in this browser.")}>{t.navHelp}</button><button onClick={() => scrollTo("studio")}>Free forever</button></div></div>
+        <div className="footer-inner"><Logo /><span>{t.footer}</span><span className="developer-credit">Developed by <strong>Aditya Softwares</strong> - QTY=Print Count, PACK SIZE=Label</span><div className="footer-links"><button onClick={() => toast.info("Dukaan Barcode Studio keeps your data local in this browser.")}>{t.navHelp}</button><button onClick={() => scrollTo("studio")}>Free forever</button></div></div>
       </footer>
     </div>
   );
