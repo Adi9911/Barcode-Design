@@ -543,7 +543,7 @@ export default function Home() {
     toast.success("Essae PLU CSV exported");
   };
 
-    const printThermalFromDesigner = async (template?: LabelTemplate) => {
+   const printThermalFromDesigner = async (template?: LabelTemplate) => {
     if (!filteredProducts.length) {
       toast.error("Upload Excel first");
       return;
@@ -552,41 +552,36 @@ export default function Home() {
     if (!tmpl) {
       try {
         const saved = JSON.parse(localStorage.getItem("dukaan-label-templates-v1") || "[]");
-        tmpl = saved.find((t: any) => activeTab === "store"? t.id.includes("store") || t.id.includes("wt") : t.id.includes("prod")) || saved[0];
+        tmpl = saved.find((t: any) => activeTab === "store"? t.id.includes("store") : t.id.includes("prod")) || saved[0];
       } catch {}
     }
     if (!tmpl) {
-      toast.error("My Labels me label select karo");
+      toast.error("My Labels me select karo");
       return;
     }
 
-    const iframe = document.createElement("iframe");
-    iframe.style.cssText = "position:fixed;left:-99999px;top:-99999px;width:0;height:0;border:0";
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow?.document;
-    if (!doc) return;
-
+    // Excel me jitna hai utna print - QTY ke hisab se copies
     const items = filteredProducts.flatMap((p) => Array.from({ length: (p.copies || 1) * (activeTab === "production"? p.qty || 1 : 1) }, () => p));
 
-    let html = "";
-    html += "<html><head><meta charset='utf-8'><title>Label</title><style>";
-    html += " @page{ size:54mm 37mm; margin:0mm!important; }";
-    html += " html,body{ width:54mm; height:37mm; margin:0!important; padding:0!important; background:white; overflow:hidden; }";
-    html += " *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }";
-    html += ".label{ width:54mm; height:37mm; margin:0!important; padding:0!important; position:relative; overflow:hidden; background:white; page-break-after:always; display:block; }";
-    html += ".label:last-child{ page-break-after:avoid; }";
-    html += ".el{ position:absolute; overflow:hidden; line-height:1.1; white-space:nowrap; font-family:Arial; }";
-    html += "</style></head><body>";
+    if (!items.length) return;
 
-    items.forEach(function (p) {
-      html += '<div class="label">';
-      tmpl.elements.forEach(function (el:any) {
+    // PAGE SIZE APP SE LOCK - 54x37 - A4 nahi
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [54, 37] });
+
+    for (let idx = 0; idx < items.length; idx++) {
+      const p = items[idx];
+      if (idx > 0) pdf.addPage([54, 37], "portrait");
+
+      pdf.setFillColor(255,255,255);
+      pdf.rect(0,0,54,37,"F");
+
+      for (const el of tmpl.elements as any[]) {
         const k = (el.dataSource || el.field || "").toLowerCase();
         let v = "";
         if (el.type === "static") v = el.text || "";
         else {
           if (activeTab === "store") {
-            const map: any = { name: p.name, code: p.code, plu: p.plu, price: Math.round(p.price).toString(), unitprice: Math.round(p.unitPrice || p.price).toString(), totalprice: Math.round(p.totalPrice || p.price).toString(), packeddate: p.packedDate, usebydate: p.useByDate, expiry: (p.expiryDays || 3) + " Days", uom: p.unit, qty: String(p.qty || 1) };
+            const map: any = { name: p.name, code: p.code, plu: p.plu, price: Math.round(p.price).toString(), unitprice: Math.round(p.unitPrice || p.price).toString(), packeddate: p.packedDate, usebydate: p.useByDate, expiry: (p.expiryDays || 3) + " Days", uom: p.unit, qty: String(p.qty || 1) };
             v = map[k] || "";
             if (k.indexOf("price") >= 0 && v) v = "CDF " + v;
           } else {
@@ -595,22 +590,48 @@ export default function Home() {
           }
           if (el.displayFormat) v = el.displayFormat.replace("{{value}}", v);
         }
+        if (!v && el.type!== "barcode") continue;
+
         if (el.type === "barcode") {
-          html += '<div class="el" style="left:' + el.x + 'mm;top:' + el.y + 'mm;width:' + el.width + 'mm;height:' + el.height + 'mm;display:flex;align-items:center;justify-content:center;background:white"><svg class="bc" data-code="' + p.code + '" style="width:100%;height:100%"></svg></div>';
+          try {
+            const canvas = document.createElement("canvas");
+            JsBarcode(canvas, p.code, { format: "CODE128", width: 1.2, height: 35, displayValue: true, fontSize: 8, margin: 0, textMargin: 1 });
+            pdf.addImage(canvas.toDataURL("image/png"), "PNG", el.x, el.y, el.width, el.height);
+          } catch {}
         } else {
-          html += '<div class="el" style="left:' + el.x + 'mm;top:' + el.y + 'mm;width:' + el.width + 'mm;height:' + el.height + 'mm;font-size:' + el.fontSize + 'pt;font-weight:' + (el.bold? 700 : 400) + ';color:' + el.color + ';text-align:' + el.align + ';display:flex;align-items:center;' + (el.align==='center'?'justify-content:center':el.align==='right'?'justify-content:flex-end':'justify-content:flex-start') + '">' + v + '</div>';
+          pdf.setFont("helvetica", el.bold? "bold" : "normal");
+          pdf.setFontSize(el.fontSize * 0.75);
+          pdf.setTextColor(el.color || "#000000");
+          let align: any = "left";
+          if (el.align === "center") align = "center";
+          if (el.align === "right") align = "right";
+          let x = el.x;
+          if (align === "center") x = el.x + el.width / 2;
+          if (align === "right") x = el.x + el.width;
+          const y = el.y + el.height * 0.7;
+          pdf.text(String(v).substring(0, 40), x, y, { align, maxWidth: el.width } as any);
         }
-      });
-      html += "</div>";
-    });
+      }
+    }
 
-    html += '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></scr' + 'ipt>';
-    html += "<script>setTimeout(function(){document.querySelectorAll('.bc').forEach(function(s){try{JsBarcode(s,s.dataset.code,{format:'CODE128',displayValue:true,margin:0,width:1.4,height:22,fontSize:9,textMargin:1});}catch(e){}}); setTimeout(function(){window.focus(); window.print();}, 800)},500);</scr" + "ipt>";
-    html += "</body></html>";
+    // PDF SAVE - PURA EXCEL - HAR PAGE 54x37
+    pdf.save(`ALL-LABELS-54x37-${activeTab}-${items.length}pcs.pdf`);
+    toast.success(`${items.length} labels ka PDF ban gaya - har page 54x37 - Gray nahi ayega`);
 
-    doc.open(); doc.write(html); doc.close();
-    toast.success(items.length + " labels - 54x37 Gap - Excel se barcode auto");
-    setTimeout(function () { try { document.body.removeChild(iframe); } catch {} }, 15000);
+    // DIRECT PRINT BHI - SAME PDF
+    try {
+      const blobUrl = pdf.output("bloburl");
+      const iframe = document.createElement("iframe");
+      iframe.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:0";
+      iframe.src = blobUrl;
+      document.body.appendChild(iframe);
+      iframe.onload = () => {
+        setTimeout(() => {
+          try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch {}
+        }, 600);
+      };
+      setTimeout(() => { try { document.body.removeChild(iframe); URL.revokeObjectURL(blobUrl); } catch {} }, 20000);
+    } catch {}
   };
 
   const generatePDF = (mrp = false) => {
