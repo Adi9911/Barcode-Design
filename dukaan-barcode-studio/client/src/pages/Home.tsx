@@ -252,6 +252,8 @@ export default function Home() {
   const [previewIdx, setPreviewIdx] = useState(0);
   const [search, setSearch] = useState("");
   const [selectedType, setSelectedType] = useState<"all" | "1" | "2">("all");
+  const [printScope, setPrintScope] = useState<"single" | "all" | "selected">("all");
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const fileRef = useRef<HTMLInputElement | null>(null);
   const t = copy[language];
   const labelCount = useMemo(() => products.reduce((total, item) => total + item.copies, 0), [products]);
@@ -327,7 +329,7 @@ export default function Home() {
           };
           const today = new Date();
           const mapped = rows
-           .map((row, index) => {
+         .map((row, index) => {
               const name = get(row, ["pluname", "item name", "itemname", "product name", "name"]);
               const code = get(row, ["plucode", "barcode", "item code", "code", "sku"]);
               const price = get(row, ["unitprice", "price", "mrp", "rate"]);
@@ -361,12 +363,11 @@ export default function Home() {
                 type: "store" as const,
               };
             })
-           .filter((item) => item.name && item.code);
+         .filter((item) => item.name && item.code);
           setStoreProducts(mapped);
           if (activeTab === "store") setProducts(mapped);
-                    // AUTO TEMPLATE BANANA - STORE
           try {
-            const key = "dukaan-label-templates-v1";
+            const key = "dukaan-label-templates-v2";
             const existing = JSON.parse(localStorage.getItem(key) || "[]");
             const newTemplate = {
               id: "auto-store-" + Date.now(),
@@ -374,19 +375,19 @@ export default function Home() {
               width: 54, height: 37,
               elements: [
                 { id: "e1", type: "text", x: 2, y: 2, width: 50, height: 5, field: "name", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
-                { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 12, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
-                { id: "e3", type: "text", x: 2, y: 21, width: 50, height: 3, field: "code", dataSource: "code", fontSize: 5, bold: false, color: "#000", align: "center", text: "" },
-                { id: "e4", type: "text", x: 2, y: 25, width: 16, height: 3, field: "packeddate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Packed: {{value}}" },
-                { id: "e5", type: "text", x: 19, y: 25, width: 16, height: 3, field: "uom", dataSource: "uom", fontSize: 6, bold: true, color: "#000", align: "center", text: "", displayFormat: "UOM: {{value}}" },
-                { id: "e6", type: "text", x: 36, y: 25, width: 16, height: 3, field: "usebydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
-                { id: "e7", type: "text", x: 2, y: 29, width: 15, height: 3, field: "plu", dataSource: "plu", fontSize: 6, bold: true, color: "#000", align: "left", text: "", displayFormat: "Link: {{value}}" },
-                { id: "e8", type: "text", x: 19, y: 29, width: 16, height: 3, field: "expiry", dataSource: "expiry", fontSize: 6, bold: true, color: "#000", align: "center", text: "" },
-                { id: "e9", type: "text", x: 36, y: 29, width: 16, height: 6, field: "unitprice", dataSource: "unitprice", fontSize: 9, bold: true, color: "#000", align: "right", text: "", displayFormat: "CDF {{value}}" },
+                { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 17, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
+                { id: "e3", type: "text", x: 2, y: 26, width: 16, height: 3, field: "packeddate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Packed: {{value}}" },
+                { id: "e4", type: "text", x: 19, y: 26, width: 16, height: 3, field: "uom", dataSource: "uom", fontSize: 6, bold: true, color: "#000", align: "center", text: "", displayFormat: "UOM: {{value}}" },
+                { id: "e5", type: "text", x: 36, y: 26, width: 16, height: 3, field: "usebydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
+                { id: "e6", type: "text", x: 2, y: 30, width: 15, height: 3, field: "plu", dataSource: "plu", fontSize: 6, bold: true, color: "#000", align: "left", text: "", displayFormat: "Link: {{value}}" },
+                { id: "e7", type: "text", x: 19, y: 30, width: 16, height: 3, field: "expiry", dataSource: "expiry", fontSize: 6, bold: true, color: "#000", align: "center", text: "" },
+                { id: "e8", type: "text", x: 36, y: 30, width: 16, height: 5, field: "unitprice", dataSource: "unitprice", fontSize: 9, bold: true, color: "#000", align: "right", text: "", displayFormat: "CDF {{value}}" },
               ]
             };
             const filtered = existing.filter((t:any)=>!t.id.startsWith("auto-"));
             filtered.unshift(newTemplate);
             localStorage.setItem(key, JSON.stringify(filtered));
+            localStorage.removeItem("dukaan-label-templates-v1");
             window.dispatchEvent(new Event("templates-updated"));
           } catch {}
           toast.success(`${mapped.length} STORE products imported`);
@@ -421,7 +422,7 @@ export default function Home() {
         setMappedFields(originalHeaders);
         const dataRows = rawData.slice(headerIdx + 1).filter((r) => r.some((c) => String(c).trim()!== ""));
         const mapped = dataRows
-         .map((r, index) => {
+       .map((r, index) => {
             const obj: Record<string, unknown> = {};
             originalHeaders.forEach((orig) => {
               const realIdx = rawData[headerIdx].findIndex((h: any) => String(h).trim() === orig);
@@ -441,7 +442,7 @@ export default function Home() {
             const qty = get(obj, ["qty", "quantity"]);
             const prod = get(obj, ["production date", "packed date"]);
             const exp = get(obj, ["expiry date", "usebydate"]);
-                        const parseDate = (d: any) => {
+            const parseDate = (d: any) => {
               if (!d) return new Date().toLocaleDateString("en-GB");
               if (typeof d === 'number') {
                 const date = new Date((d - 25569) * 86400 * 1000);
@@ -475,30 +476,28 @@ export default function Home() {
               type: "production" as const,
             };
           })
-         .filter((item) => item.name && item.code);
+       .filter((item) => item.name && item.code);
         setProdProducts(mapped);
         if (activeTab === "production") setProducts(mapped);
-                  // AUTO TEMPLATE BANANA - PRODUCTION - Price 0 nahi QTY ayega
           try {
-            const key = "dukaan-label-templates-v1";
+            const key = "dukaan-label-templates-v2";
             const existing = JSON.parse(localStorage.getItem(key) || "[]");
             const newTemplate = {
               id: "auto-prod-" + Date.now(),
               name: `PRODUCTION Auto ${mapped.length} items`,
               width: 54, height: 37,
               elements: [
-                { id: "e1", type: "text", x: 2, y: 2, width: 50, height: 5, field: "itemname", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
-                { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 12, field: "barcode", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
-                { id: "e3", type: "text", x: 2, y: 21, width: 50, height: 3, field: "code", dataSource: "code", fontSize: 5, bold: false, color: "#000", align: "center", text: "" },
-                { id: "e4", type: "text", x: 2, y: 25, width: 16, height: 3, field: "productiondate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Prod: {{value}}" },
-                { id: "e5", type: "text", x: 19, y: 25, width: 16, height: 3, field: "qty", dataSource: "qty", fontSize: 7, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}}" },
-                { id: "e6", type: "text", x: 36, y: 25, width: 16, height: 3, field: "expirydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
-                { id: "e7", type: "text", x: 2, y: 29, width: 50, height: 6, field: "qty", dataSource: "qty", fontSize: 10, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}} PCS" },
+                { id: "e1", type: "text", x: 2, y: 1, width: 50, height: 5, field: "itemname", dataSource: "name", fontSize: 7, bold: true, color: "#000", align: "center", text: "" },
+                { id: "e2", type: "barcode", x: 5, y: 6, width: 44, height: 17, field: "barcode", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
+                { id: "e3", type: "text", x: 2, y: 26, width: 16, height: 3, field: "productiondate", dataSource: "packeddate", fontSize: 4.5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Prod: {{value}}" },
+                { id: "e4", type: "text", x: 36, y: 26, width: 16, height: 3, field: "expirydate", dataSource: "usebydate", fontSize: 4.5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
+                { id: "e5", type: "text", x: 2, y: 30, width: 50, height: 5, field: "qty", dataSource: "qty", fontSize: 9, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}} PCS" },
               ]
             };
             const filtered = existing.filter((t:any)=>!t.id.startsWith("auto-"));
             filtered.unshift(newTemplate);
             localStorage.setItem(key, JSON.stringify(filtered));
+            localStorage.removeItem("dukaan-label-templates-v1");
             window.dispatchEvent(new Event("templates-updated"));
           } catch {}
         toast.success(`${mapped.length} PRODUCTION products imported`);
@@ -537,7 +536,7 @@ export default function Home() {
     }
     const rows = [
       ["PLU No", "Barcode", "Name", "Price"],
-     ...products.map((product, index) => [product.plu || String(index + 1).padStart(4, "0"), product.code, `"${product.name.replaceAll('"', '""')}"`, product.price.toFixed(2)]),
+   ...products.map((product, index) => [product.plu || String(index + 1).padStart(4, "0"), product.code, `"${product.name.replaceAll('"', '""')}"`, product.price.toFixed(2)]),
     ];
     downloadBlob(rows.map((row) => row.join(",")).join("\n"), "dukaan-essae-plu.csv", "text/csv;charset=utf-8");
     toast.success("Essae PLU CSV exported");
@@ -551,7 +550,7 @@ export default function Home() {
     let tmpl = template;
     if (!tmpl) {
       try {
-        const saved = JSON.parse(localStorage.getItem("dukaan-label-templates-v1") || "[]");
+        const saved = JSON.parse(localStorage.getItem("dukaan-label-templates-v2") || localStorage.getItem("dukaan-label-templates-v1") || "[]");
         tmpl = saved.find((t: any) => activeTab === "store"? t.id.includes("store") : t.id.includes("prod")) || saved[0];
       } catch {}
     }
@@ -560,9 +559,18 @@ export default function Home() {
       return;
     }
 
-    const items = filteredProducts.flatMap((p) => Array.from({ length: (p.copies || 1) * (activeTab === "production"? p.qty || 1 : 1) }, () => p));
+    let baseList = filteredProducts;
+    if (printScope === "single") {
+      baseList = [filteredProducts[previewIdx]].filter(Boolean) as any;
+    } else if (printScope === "selected") {
+      baseList = filteredProducts.filter(p => selectedIds.has(p.id));
+      if (!baseList.length) {
+        toast.error("Koi product select nahi kiya - table me checkbox tick karo");
+        return;
+      }
+    }
+    const items = baseList.flatMap((p) => Array.from({ length: (p.copies || 1) * (activeTab === "production"? p.qty || 1 : 1) }, () => p));
 
-    // FINAL - EXACT 54x37mm LOCK - A4 kabhi nahi banega
     const pdf = new jsPDF({
       orientation: "landscape",
       unit: "mm",
@@ -574,8 +582,6 @@ export default function Home() {
       if (idx > 0) {
         pdf.addPage([54, 37], "landscape");
       }
-
-      // white background - no border
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, 54, 37, "F");
 
@@ -596,7 +602,7 @@ export default function Home() {
         }
         if (!v && el.type!== "barcode") continue;
 
-                       if (el.type === "barcode") {
+        if (el.type === "barcode") {
           try {
             const canvas = document.createElement("canvas");
             const scale = 4;
@@ -608,8 +614,6 @@ export default function Home() {
             ctx.scale(scale, scale);
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, baseW, baseH);
-
-            // Barcode bina number ke - sirf lines
             JsBarcode(canvas, p.code, {
               format: "CODE128",
               width: 4.8,
@@ -619,38 +623,31 @@ export default function Home() {
               lineColor: "#000000",
               background: "#ffffff"
             });
-
-            // Barcode lines ko 75% height me dalo
-            const barcodeH = el.height * 0.65;
+            const barcodeH = el.height * 0.62;
             pdf.addImage(canvas.toDataURL("image/png", 1.0), "PNG", el.x, el.y, el.width, barcodeH);
-
-            // Number 144086 alag se bada, bold, clear
             pdf.setFont("helvetica", "bold");
-            pdf.setFontSize(13); // BADA - pehle 8 tha
+            pdf.setFontSize(12);
             pdf.setTextColor("#000000");
             const centerX = el.x + el.width / 2;
-            const textY = el.y + barcodeH + 3.5;
+            const textY = el.y + barcodeH + 3.2;
             pdf.text(String(p.code), centerX, textY, { align: "center" });
-
           } catch (e) { console.error(e); }
         } else {
           pdf.setFont("helvetica", el.bold? "bold" : "normal");
-                    pdf.setFontSize(Math.max(el.fontSize * 1.15, 12));
-          pdf.setFont("helvetica", "bold");
+          pdf.setFontSize(Math.max(el.fontSize * 0.85, 6.5));
           pdf.setTextColor(el.color || "#000000");
           let align: any = el.align || "left";
           let x = el.x;
           if (align === "center") x = el.x + el.width / 2;
           if (align === "right") x = el.x + el.width;
-          const y = el.y + el.height * 0.65;
+          const y = el.y + el.height * 0.70;
           if (y < 36) pdf.text(String(v).substring(0, 40), x, y, { align, maxWidth: el.width } as any);
         }
       }
     }
 
-    // 1. PDF SAVE - HAR PAGE 54x37 - 3804 pages ek file me
-    pdf.save(`THERMAL-ALL-${activeTab.toUpperCase()}-${items.length}-LABELS-54x37.pdf`);
-    toast.success(`${items.length} Labels - PDF har page 54x37 - 8.5x11 nahi`);
+    pdf.save(`THERMAL-${printScope.toUpperCase()}-${activeTab.toUpperCase()}-${items.length}-LABELS-54x37.pdf`);
+    toast.success(`${items.length} Labels - ${printScope} - 54x37 locked`);
   };
 
   const generatePDF = (mrp = false) => {
@@ -833,7 +830,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* FIX 1 - TABS NO OVERFLOW */}
           <div className="bg-white rounded-xl p-2 flex gap-2 border shadow-sm mb-3 flex-wrap items-center">
             <Button onClick={() => { setActiveTab("store"); setProducts(storeProducts); }} className={activeTab === "store"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"} title="STORE CSV: plu no,pluname,plucode,uom,unitprice,labellinkno,usebydate">
               <Store size={14} /> STORE ({storeProducts.length})
@@ -913,10 +909,11 @@ export default function Home() {
             {filteredProducts.length? (
               <div className="product-table-wrap">
                 <table className="product-table">
-                  <thead><tr><th>QTY</th><th>{t.product}</th><th>{t.barcode}</th><th>{t.price}</th><th>{t.labels}</th><th>Preview</th><th><span className="sr-only">{t.action}</span></th></tr></thead>
+                  <thead><tr><th><input type="checkbox" checked={selectedIds.size===filteredProducts.length && filteredProducts.length>0} onChange={(e) => { if(e.target.checked) setSelectedIds(new Set(filteredProducts.map(p=>p.id))); else setSelectedIds(new Set()); }} /></th><th>QTY</th><th>{t.product}</th><th>{t.barcode}</th><th>{t.price}</th><th>{t.labels}</th><th>Preview</th><th><span className="sr-only">{t.action}</span></th></tr></thead>
                   <tbody>
                     {filteredProducts.slice(0, 300).map((product, index) => (
                       <tr key={product.id}>
+                        <td><input type="checkbox" checked={selectedIds.has(product.id)} onChange={(e) => { const s = new Set(selectedIds); if(e.target.checked) s.add(product.id); else s.delete(product.id); setSelectedIds(s); }} /></td>
                         <td><Badge variant="outline">{activeTab === "production"? product.qty : 1}</Badge></td>
                         <td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" aria-label={`${t.product} name`} /><span className="subtle-label">Label {product.labelTemplate || "1"} · {product.unit || "pc"} · PLU {product.plu || "-"} · {activeTab === "store"? `${product.expiryDays} Days` : `${product.packedDate}→${product.useByDate}`}</span></div></div></td>
                         <td><div className="barcode-cell"><BarcodeMark value={product.code} compact /><Input value={product.code} onChange={(event) => updateProduct(product.id, "code", event.target.value)} className="table-input table-input--code" aria-label={`${t.barcode} value`} /></div></td>
@@ -955,14 +952,29 @@ export default function Home() {
         </section>
       </main>
 
-      {/* FIX 2 - PREVIEW ACTUAL SIZE + REAL BARCODE - NO LABEL SETTING TEXT */}
       {showPreview && filteredProducts[previewIdx] && (
         <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-3" onClick={() => setShowPreview(false)}>
           <div className="bg-white rounded-xl p-4 w-full max-w-[540px]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-3">
-              <b className="text-[11px] leading-tight">PREVIEW VERIFY - {activeTab.toUpperCase()} - Actual {printSetting.width}x{printSetting.height}mm {printSetting.orientation} - Thermal No Cut</b>
+              <b className="text-[11px] leading-tight">PREVIEW VERIFY - {activeTab.toUpperCase()} - Actual {printSetting.width}x{printSetting.height}mm {printSetting.orientation}</b>
               <Button size="sm" variant="outline" onClick={() => setShowPreview(false)}>X</Button>
             </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mb-3 flex gap-3 flex-wrap">
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer font-bold">
+                <input type="radio" name="scope" checked={printScope==="single"} onChange={() => setPrintScope("single")} />
+                <span>Single Only - {filteredProducts[previewIdx]?.name.slice(0,20)} ({filteredProducts[previewIdx]?.code})</span>
+              </label>
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer">
+                <input type="radio" name="scope" checked={printScope==="all"} onChange={() => setPrintScope("all")} />
+                <span>All {filteredProducts.length} Items</span>
+              </label>
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer">
+                <input type="radio" name="scope" checked={printScope==="selected"} onChange={() => setPrintScope("selected")} />
+                <span>Selected ({selectedIds.size}) Only</span>
+              </label>
+            </div>
+
             <div className="bg-gray-200 p-6 rounded flex justify-center items-center">
                            <div className="bg-white border-2 border-black shadow-lg relative overflow-hidden" style={{ width: (printSetting.orientation === "portrait"? printSetting.width : printSetting.height) * 3.78 + "px", height: (printSetting.orientation === "portrait"? printSetting.height : printSetting.width) * 3.78 + "px" }}>
                 <div className="absolute inset-0 p-1.5 flex flex-col justify-between">
@@ -976,7 +988,7 @@ export default function Home() {
                     </div>
                     <div className="text-right">Exp: {filteredProducts[previewIdx].useByDate}</div>
                   </div>
-                                    <div className="grid grid-cols-3 gap-1 font-bold bg-gray-50 -mx-1.5 px-1.5 py-1 mt-1" style={{ fontSize: "7px" }}>
+                  <div className="grid grid-cols-3 gap-1 font-bold bg-gray-50 -mx-1.5 px-1.5 py-1 mt-1" style={{ fontSize: "7px" }}>
                     <div>Link: {filteredProducts[previewIdx].labelTemplate} {String(filteredProducts[previewIdx].labelTemplate) === "1"? "PC" : "WT"}</div>
                     <div className="text-center">{filteredProducts[previewIdx].expiryDays} Days</div>
                     {activeTab==="store"? (
@@ -989,11 +1001,11 @@ export default function Home() {
               </div>
             </div>
             <div className="mt-3 text-[10px] bg-gray-50 p-2 rounded border">
-              <div>Product: <b>{filteredProducts[previewIdx].name}</b> - Actual {printSetting.width}x{printSetting.height}mm</div>
+              <div>Product: <b>{filteredProducts[previewIdx].name}</b> - Actual {printSetting.width}x{printSetting.height}mm - Scope: {printScope}</div>
               <div className="text-[9px] text-gray-600 mt-1">Code: {filteredProducts[previewIdx].code} | {activeTab === "store"? `PLU ${filteredProducts[previewIdx].plu} | ${filteredProducts[previewIdx].unit} | Link ${filteredProducts[previewIdx].labelTemplate} | ${filteredProducts[previewIdx].expiryDays} Days` : `Qty ${filteredProducts[previewIdx].qty} | Prod ${filteredProducts[previewIdx].packedDate} | Exp ${filteredProducts[previewIdx].useByDate}`}</div>
             </div>
             <div className="flex gap-2 mt-3">
-              <Button className="flex-1 bg-green-600 text-white h-10" onClick={() => { setShowPreview(false); setTimeout(() => printThermalFromDesigner(), 200); }}><Printer size={14} /> Sahi Hai, Print Karo - {activeTab}</Button>
+              <Button className="flex-1 bg-green-600 text-white h-10" onClick={() => { setShowPreview(false); setTimeout(() => printThermalFromDesigner(), 200); }}><Printer size={14} /> Print {printScope.toUpperCase()} - {printScope==="single"? "1": printScope==="selected"? selectedIds.size : filteredProducts.length} Labels</Button>
               <Button variant="outline" className="flex-1 h-10" onClick={() => setShowPreview(false)}>Edit Karo</Button>
             </div>
           </div>
