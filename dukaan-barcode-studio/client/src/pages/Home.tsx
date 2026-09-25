@@ -210,10 +210,7 @@ function Logo() {
     </div>
   );
 }
-      </div>
-    </div>
-  );
-}
+    
 function SectionKicker({ children, tone = "lime" }: { children: ReactNode; tone?: "lime" | "coral" }) {
   return (
     <div className={`section-kicker section-kicker--${tone}`}>
