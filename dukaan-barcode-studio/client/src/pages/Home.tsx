@@ -543,7 +543,7 @@ export default function Home() {
     toast.success("Essae PLU CSV exported");
   };
 
-   const printThermalFromDesigner = async (template?: LabelTemplate) => {
+  const printThermalFromDesigner = async (template?: LabelTemplate) => {
     if (!filteredProducts.length) {
       toast.error("Upload Excel first");
       return;
@@ -560,20 +560,24 @@ export default function Home() {
       return;
     }
 
-    // Excel me jitna hai utna print - QTY ke hisab se copies
     const items = filteredProducts.flatMap((p) => Array.from({ length: (p.copies || 1) * (activeTab === "production"? p.qty || 1 : 1) }, () => p));
 
-    if (!items.length) return;
-
-    // PAGE SIZE APP SE LOCK - 54x37 - A4 nahi
-    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [54, 37] });
+    // FINAL - EXACT 54x37mm LOCK - A4 kabhi nahi banega
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: [54, 37],
+    });
 
     for (let idx = 0; idx < items.length; idx++) {
       const p = items[idx];
-      if (idx > 0) pdf.addPage([54, 37], "portrait");
+      if (idx > 0) {
+        pdf.addPage([54, 37], "landscape");
+      }
 
-      pdf.setFillColor(255,255,255);
-      pdf.rect(0,0,54,37,"F");
+      // white background - no border
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, 0, 54, 37, "F");
 
       for (const el of tmpl.elements as any[]) {
         const k = (el.dataSource || el.field || "").toLowerCase();
@@ -595,43 +599,26 @@ export default function Home() {
         if (el.type === "barcode") {
           try {
             const canvas = document.createElement("canvas");
-            JsBarcode(canvas, p.code, { format: "CODE128", width: 1.2, height: 35, displayValue: true, fontSize: 8, margin: 0, textMargin: 1 });
+            JsBarcode(canvas, p.code, { format: "CODE128", width: 1.3, height: 45, displayValue: true, fontSize: 8, margin: 0, textMargin: 1 });
             pdf.addImage(canvas.toDataURL("image/png"), "PNG", el.x, el.y, el.width, el.height);
           } catch {}
         } else {
           pdf.setFont("helvetica", el.bold? "bold" : "normal");
-          pdf.setFontSize(el.fontSize * 0.75);
+          pdf.setFontSize(Math.min(el.fontSize * 0.75, 10));
           pdf.setTextColor(el.color || "#000000");
-          let align: any = "left";
-          if (el.align === "center") align = "center";
-          if (el.align === "right") align = "right";
+          let align: any = el.align || "left";
           let x = el.x;
           if (align === "center") x = el.x + el.width / 2;
           if (align === "right") x = el.x + el.width;
-          const y = el.y + el.height * 0.7;
-          pdf.text(String(v).substring(0, 40), x, y, { align, maxWidth: el.width } as any);
+          const y = el.y + el.height * 0.65;
+          if (y < 36) pdf.text(String(v).substring(0, 40), x, y, { align, maxWidth: el.width } as any);
         }
       }
     }
 
-    // PDF SAVE - PURA EXCEL - HAR PAGE 54x37
-    pdf.save(`ALL-LABELS-54x37-${activeTab}-${items.length}pcs.pdf`);
-    toast.success(`${items.length} labels ka PDF ban gaya - har page 54x37 - Gray nahi ayega`);
-
-    // DIRECT PRINT BHI - SAME PDF
-    try {
-      const blobUrl = pdf.output("bloburl");
-      const iframe = document.createElement("iframe");
-      iframe.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:0;height:0;border:0";
-      iframe.src = blobUrl;
-      document.body.appendChild(iframe);
-      iframe.onload = () => {
-        setTimeout(() => {
-          try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch {}
-        }, 600);
-      };
-      setTimeout(() => { try { document.body.removeChild(iframe); URL.revokeObjectURL(blobUrl); } catch {} }, 20000);
-    } catch {}
+    // 1. PDF SAVE - HAR PAGE 54x37 - 3804 pages ek file me
+    pdf.save(`THERMAL-ALL-${activeTab.toUpperCase()}-${items.length}-LABELS-54x37.pdf`);
+    toast.success(`${items.length} Labels - PDF har page 54x37 - 8.5x11 nahi`);
   };
 
   const generatePDF = (mrp = false) => {
