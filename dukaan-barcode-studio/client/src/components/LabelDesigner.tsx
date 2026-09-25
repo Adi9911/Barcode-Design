@@ -1,235 +1,248 @@
-import { useEffect, useState, useRef } from "react";
-import { toast } from "sonner";
+import { useState, useRef, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
-export interface LabelElement {
+export type LabelElement = {
   id: string;
   type: "text" | "barcode" | "static";
   x: number; y: number; width: number; height: number;
-  field: string;
-  dataSource: string;
-  fontSize: number;
-  bold: boolean;
-  color: string;
-  align: "left" | "center" | "right";
-  text: string;
-  displayFormat?: string;
+  field: string; dataSource: string;
+  fontSize: number; bold: boolean; color: string;
+  align: "left"|"center"|"right";
+  text: string; displayFormat?: string;
 }
 
-export interface LabelTemplate {
-  id: string;
-  name: string;
-  width: number;
-  height: number;
+export type LabelTemplate = {
+  id: string; name: string; width: number; height: number;
   elements: LabelElement[];
 }
 
-const STORAGE_KEY = "dukaan-label-templates-v1";
-
-// FIXED - Print me bada nahi hoga
-function RealBarcode({ value }: { value: string, width: number, height: number }) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  useEffect(() => {
-    // @ts-ignore
-    const JsBarcode = (window as any).JsBarcode;
-    if (svgRef.current && value && JsBarcode) {
-      try {
-        const cleanVal = String(value).replace(/[^0-9A-Za-z]/g, "").trim() || "8000000010";
-        JsBarcode(svgRef.current, cleanVal, {
-          format: "CODE128",
-          width: 1.4,
-          height: 24,
-          displayValue: false,
-          margin: 0,
-          background: "#ffffff",
-          lineColor: "#000000",
-        });
-      } catch (e) {}
-    }
-  }, [value]);
-  return <svg ref={svgRef} style={{ width: "100%", height: "100%", display: "block" }} />;
-}
-
-const DEFAULT_TEMPLATES: LabelTemplate[] = [
-  {
-    id: "store-default",
-    name: "STORE 54x37 - Full Barcode",
-    width: 54, height: 37,
-    elements: [
-      { id: "e1", type: "text", x: 2, y: 1.5, width: 50, height: 4.5, field: "name", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
-      { id: "e2", type: "barcode", x: 1, y: 6.5, width: 52, height: 16, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
-      { id: "e3", type: "text", x: 2, y: 22.8, width: 50, height: 3, field: "code", dataSource: "code", fontSize: 5, bold: false, color: "#000", align: "center", text: "" },
-      { id: "e4", type: "text", x: 2, y: 26, width: 16, height: 3, field: "packeddate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Packed: {{value}}" },
-      { id: "e5", type: "text", x: 19, y: 26, width: 16, height: 3, field: "uom", dataSource: "uom", fontSize: 6, bold: true, color: "#000", align: "center", text: "", displayFormat: "UOM: {{value}}" },
-      { id: "e6", type: "text", x: 36, y: 26, width: 16, height: 3, field: "usebydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
-      { id: "e7", type: "text", x: 2, y: 30, width: 15, height: 3, field: "plu", dataSource: "plu", fontSize: 6, bold: true, color: "#000", align: "left", text: "", displayFormat: "Link: {{value}}" },
-      { id: "e8", type: "text", x: 19, y: 30, width: 16, height: 3, field: "expiry", dataSource: "expiry", fontSize: 6, bold: true, color: "#000", align: "center", text: "" },
-      { id: "e9", type: "text", x: 36, y: 30, width: 16, height: 6, field: "unitprice", dataSource: "unitprice", fontSize: 9, bold: true, color: "#000", align: "right", text: "", displayFormat: "CDF {{value}}" },
-    ]
-  },
-  {
-    id: "prod-default",
-    name: "PRODUCTION 54x37 - Full Scan",
-    width: 54, height: 37,
-    elements: [
-      { id: "e1", type: "text", x: 2, y: 1.5, width: 50, height: 4.5, field: "name", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
-      { id: "e2", type: "barcode", x: 1, y: 6.5, width: 52, height: 16, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
-      { id: "e3", type: "text", x: 2, y: 22.8, width: 50, height: 3, field: "code", dataSource: "code", fontSize: 5, bold: false, color: "#000", align: "center", text: "" },
-      { id: "e4", type: "text", x: 2, y: 26, width: 16, height: 3, field: "packeddate", dataSource: "packeddate", fontSize: 5, bold: false, color: "#000", align: "left", text: "", displayFormat: "Prod: {{value}}" },
-      { id: "e5", type: "text", x: 19, y: 26, width: 16, height: 3, field: "qty", dataSource: "qty", fontSize: 7, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}}" },
-      { id: "e6", type: "text", x: 36, y: 26, width: 16, height: 3, field: "usebydate", dataSource: "usebydate", fontSize: 5, bold: false, color: "#000", align: "right", text: "", displayFormat: "Exp: {{value}}" },
-      { id: "e7", type: "text", x: 2, y: 30, width: 50, height: 6, field: "qty", dataSource: "qty", fontSize: 10, bold: true, color: "#000", align: "center", text: "", displayFormat: "QTY: {{value}} PCS" },
-    ]
-  }
-];
-
 export default function LabelDesigner({ products }: { products: any[] }) {
-  const [templates, setTemplates] = useState<LabelTemplate[]>([]);
-  const [selectedId, setSelectedId] = useState<string>("");
-  const [selectedElId, setSelectedElId] = useState<string>("");
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, elId: string } | null>(null);
-
-  const loadTemplates = () => {
+  const [templates, setTemplates] = useState<LabelTemplate[]>(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      if (saved.length === 0) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(DEFAULT_TEMPLATES));
-        setTemplates(DEFAULT_TEMPLATES);
-        setSelectedId(DEFAULT_TEMPLATES[0].id);
-      } else {
-        setTemplates(saved);
-        if (!selectedId) setSelectedId(saved[0].id);
-      }
-    } catch {
-      setTemplates(DEFAULT_TEMPLATES);
-      setSelectedId(DEFAULT_TEMPLATES[0].id);
-    }
+      const saved = JSON.parse(localStorage.getItem("dukaan-label-templates-v1") || "[]");
+      // size ko lock rakho 54x37
+      return saved.map((t:any) => ({...t, width: 54, height: 37}));
+    } catch { return [] }
+  });
+
+  const [activeId, setActiveId] = useState<string>(templates[0]?.id || "");
+  const [selectedEl, setSelectedEl] = useState<string | null>(null);
+  const [drag, setDrag] = useState<any>(null);
+  const [editingText, setEditingText] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  const activeTemplate = templates.find(t => t.id === activeId) || templates[0];
+
+  useEffect(() => {
+    localStorage.setItem("dukaan-label-templates-v1", JSON.stringify(templates));
+    window.dispatchEvent(new Event("templates-updated"));
+  }, [templates]);
+
+  const updateEl = (id: string, patch: Partial<LabelElement>) => {
+    setTemplates(prev => prev.map(t =>
+      t.id === activeId
+       ? {...t, elements: t.elements.map(e => e.id === id? {...e,...patch} : e)}
+        : t
+    ));
+  };
+
+  const handleMouseDown = (e: React.MouseEvent, el: LabelElement, mode: "move" | "resize" = "move") => {
+    e.stopPropagation();
+    setSelectedEl(el.id);
+    setEditingText(null);
+    const rect = canvasRef.current!.getBoundingClientRect();
+    setDrag({
+      id: el.id, mode,
+      startX: e.clientX, startY: e.clientY,
+      origX: el.x, origY: el.y,
+      origW: el.width, origH: el.height,
+      origFont: el.fontSize,
+      canvasW: rect.width, canvasH: rect.height
+    });
   };
 
   useEffect(() => {
-    loadTemplates();
-    const handler = () => loadTemplates();
-    window.addEventListener("templates-updated", handler);
-    window.addEventListener("storage", handler);
-    return () => {
-      window.removeEventListener("templates-updated", handler);
-      window.removeEventListener("storage", handler);
+    const onMove = (e: MouseEvent) => {
+      if (!drag ||!activeTemplate) return;
+      const dxMm = (e.clientX - drag.startX) / drag.canvasW * activeTemplate.width;
+      const dyMm = (e.clientY - drag.startY) / drag.canvasH * activeTemplate.height;
+
+      if (drag.mode === "move") {
+        // MOVE - cursor se khicho
+        updateEl(drag.id, {
+          x: Math.max(0, Math.min(drag.origX + dxMm, activeTemplate.width - drag.origW)),
+          y: Math.max(0, Math.min(drag.origY + dyMm, activeTemplate.height - drag.origH))
+        });
+      } else {
+        // RESIZE - corner se khicho + text bhi bada/chhota ho
+        const newW = Math.max(4, drag.origW + dxMm);
+        const newH = Math.max(3, drag.origH + dyMm);
+        // font bhi proportional bada/chhota
+        const scale = newW / drag.origW;
+        const newFont = Math.max(3, Math.min(20, drag.origFont * scale));
+
+        updateEl(drag.id, {
+          width: Math.min(newW, activeTemplate.width - drag.origX),
+          height: Math.min(newH, activeTemplate.height - drag.origY),
+          fontSize: newFont
+        });
+      }
     };
-  }, []);
+    const onUp = () => setDrag(null);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); }
+  }, [drag, activeTemplate]);
 
-  const selectedTemplate = templates.find(t => t.id === selectedId);
-  const selectedEl = selectedTemplate?.elements.find(e => e.id === selectedElId);
+  if (!activeTemplate) {
+    return <div className="p-4 border rounded bg-white text-xs">Excel upload karo - Auto template 54x37 banega</div>;
+  }
 
-  const saveTemplates = (newTemplates: LabelTemplate[]) => {
-    setTemplates(newTemplates);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newTemplates));
-  };
-
-  const updateElement = (elId: string, patch: Partial<LabelElement>) => {
-    const newTemplates = templates.map(t => t.id === selectedId? {...t, elements: t.elements.map(e => e.id === elId? {...e,...patch } : e) } : t);
-    saveTemplates(newTemplates);
-  };
-
-  const fieldOptions = [
-    { value: "name", label: "Product Name / ITEM NAME" },
-    { value: "code", label: "Barcode / BARCODE" },
-    { value: "plu", label: "PLU No / Label Link No" },
-    { value: "uom", label: "UOM - PC / WT / GRM" },
-    { value: "unitprice", label: "Unit Price / Price" },
-    { value: "totalprice", label: "Total Price" },
-    { value: "packeddate", label: "Packed Date / Production Date" },
-    { value: "usebydate", label: "Expiry Date / UseBy Date" },
-    { value: "expiry", label: "Validity / Expiry Days" },
-    { value: "qty", label: "QTY / Quantity - PRODUCTION ke liye" },
-  ];
-
-  if (!selectedTemplate) return null;
-
-  const sample = products[0] || { name: "Sample Product", code: "800000001", plu: "1", unit: "PC", unitPrice: 4300, price: 4300, packedDate: "01/01/1970", useByDate: "01/01/1970", expiryDays: 3, qty: 225 };
-
-  const getValue = (dataSource: string) => {
-    const map: any = {
-      name: sample.name,
-      code: sample.code,
-      plu: sample.plu || sample.labelTemplate || "1",
-      uom: sample.unit || "PC",
-      unitprice: sample.unitPrice || sample.price,
-      totalprice: sample.totalPrice || sample.price,
-      packeddate: sample.packedDate,
-      usebydate: sample.useByDate,
-      expiry: sample.expiryDays? `${sample.expiryDays} Days` : "3 Days",
-      qty: sample.qty || 1,
-    };
-    return map[dataSource] || dataSource;
-  };
+  const sample = products[0];
 
   return (
-    <div id="labels" className="bg-white rounded-xl border p-4 mt-6 anchor-section">
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-        <h2 className="font-bold text-lg">My Labels - Full Barcode - Blur Proof</h2>
-        <div className="flex gap-2">
-          {templates.map(t => (
-            <button key={t.id} onClick={() => setSelectedId(t.id)} className={`px-3 py-1.5 rounded text-xs border ${selectedId === t.id? "bg-black text-white" : "bg-gray-100"}`}>
-              {t.name}
-            </button>
-          ))}
+    <div className="bg-white border rounded-xl p-3 mt-4" id="labels">
+      <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
+        <div className="flex gap-2 items-center">
+          <Badge className="bg-black text-white">LABEL DESIGNER - 54x37 LOCKED - Drag & Edit</Badge>
+          <select value={activeId} onChange={e => setActiveId(e.target.value)} className="border rounded h-8 px-2 text-xs">
+            {templates.map(t => <option key={t.id} value={t.id}>{t.name} - {t.width}x{t.height}mm LOCKED</option>)}
+          </select>
         </div>
+        <div className="text-[10px] text-gray-500">👉 Field pe click = select | Drag karo = move | 🔵 Blue dot = corner se resize + text auto bada/chhota</div>
       </div>
 
-      <div className="grid md:grid-cols-[1fr_280px] gap-4">
-        <div className="bg-gray-100 p-6 rounded-lg flex justify-center items-center min-h-[300px] relative">
-          <div className="bg-white border-2 border-black shadow-lg relative" style={{ width: selectedTemplate.width * 3.78, height: selectedTemplate.height * 3.78 }}>
-            {selectedTemplate.elements.map(el => {
-              const rawVal = getValue(el.dataSource);
-              const displayVal = el.displayFormat? el.displayFormat.replace("{{value}}", String(rawVal)) : String(rawVal);
-              const isSelected = selectedElId === el.id;
-              return (
-                <div
-                  key={el.id}
-                  onClick={() => setSelectedElId(el.id)}
-                  onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, elId: el.id }); setSelectedElId(el.id); }}
-                  className={`absolute cursor-move hover:bg-yellow-100 ${isSelected? "bg-blue-100 ring-2 ring-blue-500" : ""} ${el.type==="barcode"? "bg-white" : ""}`}
-                  style={{
-                    left: el.x * 3.78, top: el.y * 3.78, width: el.width * 3.78, height: el.height * 3.78,
-                    fontSize: el.fontSize, fontWeight: el.bold? 700 : 400, color: el.color,
-                    textAlign: el.align, display: "flex", alignItems: "center",
-                    justifyContent: el.align === "center"? "center" : el.align === "right"? "flex-end" : "flex-start",
-                    overflow: "hidden", lineHeight: 1.1, whiteSpace: "nowrap"
-                  }}
-                >
-                  {el.type === "barcode"? <RealBarcode value={String(rawVal)} width={el.width} height={el.height} /> : displayVal}
-                </div>
-              );
-            })}
-          </div>
+      <div className="flex gap-4 flex-wrap">
+        {/* CANVAS - 54x37 LOCKED SIZE */}
+        <div ref={canvasRef} className="relative bg-white border-[2px] border-black shadow-lg select-none"
+          style={{ width: "432px", height: "296px" }} // 54*8 x 37*8 - FIXED
+          onMouseDown={() => { setSelectedEl(null); setEditingText(null); }}
+        >
+          <div className="absolute top-0 left-0 text-[8px] bg-black text-white px-1">54x37mm LOCKED - Size change nahi hoga</div>
+
+          {activeTemplate.elements.map(el => {
+            const isSel = selectedEl === el.id;
+            const isEditing = editingText === el.id;
+            const k = (el.dataSource || el.field || "").toLowerCase();
+            let v = el.type === "static"? el.text : (sample as any)?.[k] || el.field;
+            if (el.displayFormat && v && el.type!== "static") {
+              try { v = el.displayFormat.replace("{{value}}", String(v)); } catch {}
+            }
+            if (el.type === "barcode" && sample) v = sample.code || "123456";
+
+            return (
+              <div key={el.id}
+                className={`absolute group ${isSel? "border-2 border-blue-600 bg-blue-50/30" : "border border-dashed border-gray-400 hover:border-blue-400"} ${isEditing? "" : "cursor-move"}`}
+                style={{
+                  left: el.x * 8 + "px",
+                  top: el.y * 8 + "px",
+                  width: el.width * 8 + "px",
+                  height: el.height * 8 + "px",
+                }}
+                onMouseDown={e =>!isEditing && handleMouseDown(e, el, "move")}
+                onDoubleClick={() => setEditingText(el.id)}
+              >
+                {isEditing? (
+                  <Input
+                    autoFocus
+                    value={el.type === "static"? el.text : el.displayFormat || ""}
+                    onChange={e => updateEl(el.id, el.type === "static"? { text: e.target.value } : { displayFormat: e.target.value })}
+                    onBlur={() => setEditingText(null)}
+                    onKeyDown={e => e.key === "Enter" && setEditingText(null)}
+                    className="w-full h-full text-[10px] p-1"
+                    placeholder="{{value}} use karo"
+                  />
+                ) : el.type === "barcode"? (
+                  <div className="w-full h-full bg-white border flex flex-col items-center justify-center">
+                    <div className="w-full h-[70%] bg-[repeating-linear-gradient(90deg,black,black_2px,white_2px,white_4px)]"></div>
+                    <div className="text-[8px] font-mono font-bold">{String(v).slice(0, 12)}</div>
+                  </div>
+                ) : (
+                  <div className="w-full h-full flex items-center overflow-hidden px-1"
+                    style={{
+                      fontSize: el.fontSize * 0.85 + "px",
+                      fontWeight: el.bold? 700 : 400,
+                      textAlign: el.align as any,
+                      color: el.color,
+                      justifyContent: el.align === "center"? "center" : el.align === "right"? "flex-end" : "flex-start"
+                    }}
+                  >
+                    <span className="truncate">{String(v).slice(0, 40)}</span>
+                  </div>
+                )}
+
+                {/* RESIZE HANDLE - Corner se khicho */}
+                {isSel &&!isEditing && (
+                  <>
+                    <div className="absolute -right-2 -bottom-2 w-4 h-4 bg-blue-600 rounded-full border-2 border-white cursor-nwse-resize shadow-lg flex items-center justify-center"
+                      onMouseDown={e => handleMouseDown(e, el, "resize")}
+                      title="Is corner se khicho - size + text dono bada/chhota hoga"
+                    >
+                      <div className="w-1 h-1 bg-white rounded-full"></div>
+                    </div>
+                    <div className="absolute -top-6 left-0 bg-blue-600 text-white text-[9px] px-2 py-0.5 rounded whitespace-nowrap">
+                      {el.field} | {el.width.toFixed(1)}x{el.height.toFixed(1)}mm | Font: {el.fontSize.toFixed(1)}pt - Corner se khicho to text bhi bada hoga
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        <div className="border rounded-lg p-3 bg-gray-50">
-          <h3 className="font-bold text-sm mb-3">Field Edit</h3>
-          {!selectedEl? <p className="text-xs text-gray-500">Label par click karo</p> : (
-            <div className="space-y-3">
-              <select value={selectedEl.dataSource} onChange={(e) => updateElement(selectedEl.id, { dataSource: e.target.value, field: e.target.value })} className="w-full border rounded h-8 text-xs px-2">
-                {fieldOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-              <div className="grid grid-cols-2 gap-2">
-                <input type="number" step={0.5} value={selectedEl.x} onChange={(e) => updateElement(selectedEl.id, { x: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" placeholder="X" />
-                <input type="number" step={0.5} value={selectedEl.y} onChange={(e) => updateElement(selectedEl.id, { y: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" placeholder="Y" />
-                <input type="number" step={0.5} value={selectedEl.width} onChange={(e) => updateElement(selectedEl.id, { width: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" placeholder="W" />
-                <input type="number" step={0.5} value={selectedEl.height} onChange={(e) => updateElement(selectedEl.id, { height: Number(e.target.value) })} className="w-full border rounded h-7 text-xs px-1" placeholder="H" />
+        {/* EDIT PANEL */}
+        <div className="flex-1 min-w-[260px] border rounded-lg p-3 bg-gray-50 max-h-[320px] overflow-auto">
+          {selectedEl? (() => {
+            const el = activeTemplate.elements.find(e => e.id === selectedEl)!;
+            return (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <b className="text-xs">{el.field.toUpperCase()} EDIT</b>
+                  <Badge variant="outline" className="text-[9px]">Text resize = corner drag</Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-[9px] font-bold">X Position mm</label><Input type="number" step={0.5} value={el.x.toFixed(1)} onChange={e => updateEl(el.id, { x: Number(e.target.value) })} className="h-7 text-xs" /></div>
+                  <div><label className="text-[9px] font-bold">Y Position mm</label><Input type="number" step={0.5} value={el.y.toFixed(1)} onChange={e => updateEl(el.id, { y: Number(e.target.value) })} className="h-7 text-xs" /></div>
+                  <div><label className="text-[9px] font-bold">Width mm</label><Input type="number" step={0.5} value={el.width.toFixed(1)} onChange={e => { const newW = Number(e.target.value); const scale = newW / el.width; updateEl(el.id, { width: newW, fontSize: el.fontSize * scale }); }} className="h-7 text-xs" /></div>
+                  <div><label className="text-[9px] font-bold">Height mm</label><Input type="number" step={0.5} value={el.height.toFixed(1)} onChange={e => updateEl(el.id, { height: Number(e.target.value) })} className="h-7 text-xs" /></div>
+                </div>
+
+                <div><label className="text-[9px] font-bold">Font Size pt - Corner drag se auto change hota hai</label><Input type="number" step={0.5} value={el.fontSize.toFixed(1)} onChange={e => updateEl(el.id, { fontSize: Number(e.target.value) })} className="h-7 text-xs" /></div>
+
+                <div><label className="text-[9px] font-bold">Text / Format - Direct keyboard se edit karo</label>
+                  <Input
+                    value={el.type === "static"? el.text : el.displayFormat || ""}
+                    onChange={e => updateEl(el.id, el.type === "static"? { text: e.target.value } : { displayFormat: e.target.value })}
+                    className="h-7 text-xs"
+                    placeholder='Exp: {{value}} ya Packed: {{value}}'
+                  />
+                  <div className="text-[8px] text-gray-500 mt-1">Double-click field pe bhi direct edit kar sakte ho</div>
+                </div>
+
+                <div className="flex gap-1 flex-wrap">
+                  <Button size="sm" variant={el.bold? "default" : "outline"} className="h-7 text-[10px]" onClick={() => updateEl(el.id, { bold:!el.bold })}>B Bold</Button>
+                  <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => updateEl(el.id, { align: el.align === "left"? "center" : el.align === "center"? "right" : "left" })}>Align: {el.align}</Button>
+                  <Button size="sm" variant="destructive" className="h-7 text-[10px]" onClick={() => setTemplates(prev => prev.map(t => t.id === activeId? {...t, elements: t.elements.filter(e => e.id!== el.id)} : t))}>Delete Field</Button>
+                </div>
               </div>
+            );
+          })() : (
+            <div className="text-[11px] text-gray-600 p-3 text-center">
+              <div className="text-lg mb-1">👆</div>
+              <b>Kaise use kare:</b><br/>
+              1. Label me kisi bhi field pe click karo<br/>
+              2. <b>Drag karo</b> - field move hoga<br/>
+              3. <b>Blue dot corner se khicho</b> - size bada/chhota + andar ka text bhi auto bada/chhota hoga<br/>
+              4. <b>Double-click</b> - keyboard se direct edit<br/>
+              <br/>
+              <Badge className="text-[9px]">Label size 54x37 LOCKED hai - change nahi hoga</Badge>
             </div>
           )}
         </div>
       </div>
-
-      {contextMenu && (
-        <div className="fixed bg-white border shadow-2xl rounded-lg p-2 z-[9999] w-64" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseLeave={() => setContextMenu(null)}>
-          {fieldOptions.map(opt => (
-            <button key={opt.value} className="w-full text-left text-xs px-3 py-2 hover:bg-black hover:text-white rounded" onClick={() => { updateElement(contextMenu.elId, { dataSource: opt.value, field: opt.value }); setContextMenu(null); toast.success(`${opt.label} set`); }}>
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
