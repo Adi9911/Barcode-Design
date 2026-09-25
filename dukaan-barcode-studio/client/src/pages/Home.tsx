@@ -164,7 +164,6 @@ const copy = {
 function formatPrice(price: number) {
   return `₹${price.toLocaleString("en-IN")}`;
 }
-
 function downloadBlob(content: string, filename: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -176,7 +175,6 @@ function downloadBlob(content: string, filename: string, type: string) {
   anchor.remove();
   URL.revokeObjectURL(url);
 }
-
 function BarcodeMark({ value, compact = false }: { value: string; compact?: boolean }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   useEffect(() => {
@@ -196,7 +194,6 @@ function BarcodeMark({ value, compact = false }: { value: string; compact?: bool
   }, [value, compact]);
   return <svg ref={svgRef} className={compact? "barcode-svg barcode-svg--compact" : "barcode-svg"} aria-label={`Barcode ${value}`} />;
 }
-
 function Logo() {
   return (
     <div className="brand-lockup">
@@ -213,7 +210,6 @@ function Logo() {
     </div>
   );
 }
-
 function SectionKicker({ children, tone = "lime" }: { children: ReactNode; tone?: "lime" | "coral" }) {
   return (
     <div className={`section-kicker section-kicker--${tone}`}>
@@ -222,7 +218,6 @@ function SectionKicker({ children, tone = "lime" }: { children: ReactNode; tone?
     </div>
   );
 }
-
 function StepCard({ number, icon: Icon, title, body }: { number: string; icon: typeof Upload; title: string; body: string }) {
   return (
     <div className="step-card">
@@ -335,7 +330,7 @@ export default function Home() {
           };
           const today = new Date();
           const mapped = rows
-           .map((row, index) => {
+          .map((row, index) => {
               const name = get(row, ["pluname", "item name", "itemname", "product name", "name"]);
               const code = get(row, ["plucode", "barcode", "item code", "code", "sku"]);
               const price = get(row, ["unitprice", "price", "mrp", "rate"]);
@@ -370,7 +365,7 @@ export default function Home() {
                 type: "store" as const,
               };
             })
-           .filter((item) => item.name && item.code);
+          .filter((item) => item.name && item.code);
           setStoreProducts(mapped);
           if (activeTab === "store") setProducts(mapped);
           try {
@@ -379,8 +374,7 @@ export default function Home() {
             const newTemplate = {
               id: "auto-store-" + Date.now(),
               name: `STORE Auto ${mapped.length} items`,
-              width: 54,
-              height: 37,
+              width: 54, height: 37,
               elements: [
                 { id: "e1", type: "text", x: 2, y: 2, width: 50, height: 5, field: "name", dataSource: "name", fontSize: 8, bold: true, color: "#000", align: "center", text: "" },
                 { id: "e2", type: "barcode", x: 5, y: 8, width: 44, height: 17, field: "code", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
@@ -430,7 +424,7 @@ export default function Home() {
         setMappedFields(originalHeaders);
         const dataRows = rawData.slice(headerIdx + 1).filter((r) => r.some((c) => String(c).trim()!== ""));
         const mapped = dataRows
-         .map((r, index) => {
+        .map((r, index) => {
             const obj: Record<string, unknown> = {};
             originalHeaders.forEach((orig) => {
               const realIdx = rawData[headerIdx].findIndex((h: any) => String(h).trim() === orig);
@@ -486,7 +480,7 @@ export default function Home() {
               type: "production" as const,
             };
           })
-         .filter((item) => item.name && item.code);
+        .filter((item) => item.name && item.code);
         setProdProducts(mapped);
         if (activeTab === "production") setProducts(mapped);
         try {
@@ -495,8 +489,7 @@ export default function Home() {
           const newTemplate = {
             id: "auto-prod-" + Date.now(),
             name: `PRODUCTION Auto ${mapped.length} items`,
-            width: 54,
-            height: 37,
+            width: 54, height: 37,
             elements: [
               { id: "e1", type: "text", x: 2, y: 1, width: 50, height: 5, field: "itemname", dataSource: "name", fontSize: 7, bold: true, color: "#000", align: "center", text: "" },
               { id: "e2", type: "barcode", x: 5, y: 6, width: 44, height: 17, field: "barcode", dataSource: "code", fontSize: 8, bold: false, color: "#000", align: "center", text: "" },
@@ -529,12 +522,10 @@ export default function Home() {
     }
     parseWorkbook(file);
   };
-
   const handleFileInput = (event: ChangeEvent<HTMLInputElement>) => {
     handleFile(event.target.files?.[0]);
     event.target.value = "";
   };
-
   const filteredProducts = useMemo(() => {
     let list = products;
     if (activeTab === "store" && selectedType!== "all") list = list.filter((p) => (p.labelTemplate || "1") === selectedType);
@@ -549,7 +540,7 @@ export default function Home() {
     }
     const rows = [
       ["PLU No", "Barcode", "Name", "Price"],
-     ...products.map((product, index) => [product.plu || String(index + 1).padStart(4, "0"), product.code, `"${product.name.replaceAll('"', '""')}"`, product.price.toFixed(2)]),
+    ...products.map((product, index) => [product.plu || String(index + 1).padStart(4, "0"), product.code, `"${product.name.replaceAll('"', '""')}"`, product.price.toFixed(2)]),
     ];
     downloadBlob(rows.map((row) => row.join(",")).join("\n"), "dukaan-essae-plu.csv", "text/csv;charset=utf-8");
     toast.success("Essae PLU CSV exported");
@@ -571,7 +562,6 @@ export default function Home() {
       toast.error("My Labels me select karo");
       return;
     }
-
     let baseList = filteredProducts;
     if (printScope === "single") {
       baseList = [filteredProducts[previewIdx]].filter(Boolean) as any;
@@ -583,21 +573,12 @@ export default function Home() {
       }
     }
     const items = baseList.flatMap((p) => Array.from({ length: (p.copies || 1) * (p.qty || 1) }, () => p));
-
-    const pdf = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: [54, 37],
-    });
-
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [54, 37] });
     for (let idx = 0; idx < items.length; idx++) {
       const p = items[idx];
-      if (idx > 0) {
-        pdf.addPage([54, 37], "landscape");
-      }
+      if (idx > 0) pdf.addPage([54, 37], "landscape");
       pdf.setFillColor(255, 255, 255);
       pdf.rect(0, 0, 54, 37, "F");
-
       for (const el of tmpl.elements as any[]) {
         const k = (el.dataSource || el.field || "").toLowerCase();
         let v = "";
@@ -614,7 +595,6 @@ export default function Home() {
           if (el.displayFormat) v = el.displayFormat.replace("{{value}}", v);
         }
         if (!v && el.type!== "barcode") continue;
-
         if (el.type === "barcode") {
           try {
             const canvas = document.createElement("canvas");
@@ -627,15 +607,7 @@ export default function Home() {
             ctx.scale(scale, scale);
             ctx.fillStyle = "#ffffff";
             ctx.fillRect(0, 0, baseW, baseH);
-            JsBarcode(canvas, p.code, {
-              format: "CODE128",
-              width: 4.8,
-              height: 120,
-              displayValue: false,
-              margin: 0,
-              lineColor: "#000000",
-              background: "#ffffff"
-            });
+            JsBarcode(canvas, p.code, { format: "CODE128", width: 4.8, height: 120, displayValue: false, margin: 0, lineColor: "#000000", background: "#ffffff" });
             const barcodeH = el.height * 0.62;
             pdf.addImage(canvas.toDataURL("image/png", 1.0), "PNG", el.x, el.y, el.width, barcodeH);
             pdf.setFont("helvetica", "bold");
@@ -658,7 +630,6 @@ export default function Home() {
         }
       }
     }
-
     pdf.save(`THERMAL-${printScope.toUpperCase()}-${activeTab.toUpperCase()}-${items.length}-LABELS-54x37.pdf`);
     toast.success(`${items.length} Labels - ${printScope} - 54x37 locked`);
   };
@@ -833,80 +804,63 @@ export default function Home() {
               <p>{t.uploadBody}</p>
             </div>
             <div className="format-badges">
-              <Badge variant="outline">
-                <FileSpreadsheet size={14} />.XLSX
-              </Badge>
-              <Badge variant="outline">
-                <FileText size={14} />.CSV
-              </Badge>
+              <Badge variant="outline"><FileSpreadsheet size={14} />.XLSX</Badge>
+              <Badge variant="outline"><FileText size={14} />.CSV</Badge>
               <Badge variant="outline">LFT</Badge>
             </div>
           </div>
 
           <div className="bg-white rounded-xl p-2 flex gap-2 border shadow-sm mb-3 flex-wrap items-center">
-            <Button onClick={() => { setActiveTab("store"); setProducts(storeProducts); }} className={activeTab === "store"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"} title="STORE CSV: plu no,pluname,plucode,uom,unitprice,labellinkno,usebydate">
+            <Button onClick={() => { setActiveTab("store"); setProducts(storeProducts); }} className={activeTab === "store"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"}>
               <Store size={14} /> STORE ({storeProducts.length})
             </Button>
-            <Button onClick={() => { setActiveTab("production"); setProducts(prodProducts); }} className={activeTab === "production"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"} title="PRODUCTION XLSX: QTY, ITEM NAME, BARCODE, PACK SIZE, Production Date, Expiry Date">
+            <Button onClick={() => { setActiveTab("production"); setProducts(prodProducts); }} className={activeTab === "production"? "bg-black text-white text-xs px-3 h-8" : "bg-gray-100 text-black text-xs px-3 h-8"}>
               <Factory size={14} /> PRODUCTION ({prodProducts.length})
             </Button>
             <div className="ml-auto flex gap-2 items-center flex-wrap">
-              <Badge variant="outline" className="text-[10px]">54x37 Thermal - No Cut - QTY=Print</Badge>
+              <Badge variant="outline" className="text-[10px]">54x37 Thermal</Badge>
               <Badge className={activeTab === "store"? "bg-green-600 text-[10px]" : "bg-orange-600 text-[10px]"}>{activeTab.toUpperCase()}</Badge>
-            </div>
-            <div className="w-full text-[9px] text-gray-400 mt-1 hidden md:block">
-              {activeTab === "store"? "STORE fields: plu no, pluname, plucode, uom (0=PC/1=GRM), unitprice, labellinkno, usebydate (days)" : "PRODUCTION NEW: QTY=Print Count (15), PACK SIZE=Label pe (2 PCS / 10 PCS / 500 GRM), ITEM NAME, BARCODE, Production Date, Expiry Date"}
             </div>
           </div>
 
           <div className={`upload-zone ${isDragging? "upload-zone--active" : ""}`} onDragOver={(event) => { event.preventDefault(); setIsDragging(true); }} onDragLeave={() => setIsDragging(false)} onDrop={(event) => { event.preventDefault(); setIsDragging(false); handleFile(event.dataTransfer.files[0]); }}>
             <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,.lft,.txt" onChange={handleFileInput} className="sr-only" />
-            <div className="upload-icon">
-              <CloudUpload size={27} />
-            </div>
+            <div className="upload-icon"><CloudUpload size={27} /></div>
             <div className="upload-copy">
               <strong>{isDragging? "Drop it here" : `Drag & drop your ${activeTab.toUpperCase()} file here`}</strong>
-              <span>{activeTab === "store"? "STORE CSV: plu no, pluname, plucode, uom (0=PC/1=GRM), unitprice, labellinkno, usebydate (days)" : "PRODUCTION: QTY=Kitne Print (15), PACK SIZE=Kitne PC/GRM (2 PCS), ITEM NAME, BARCODE, Production Date, Expiry Date"}</span>
+              <span>Supports XLSX and CSV files - Auto column detection</span>
             </div>
             <div className="upload-actions">
               <Button className="button button--dark" onClick={() => fileRef.current?.click()}>
-                <Upload size={16} />
-                {t.browse} {activeTab}
+                <Upload size={16} /> {t.browse} {activeTab}
               </Button>
-              <span className="free-usage-note">QTY = Print Count, PACK SIZE = Label</span>
             </div>
           </div>
 
           <div className="label-config-row" style={{ flexWrap: "wrap", gap: "12px" }}>
             <div className="label-config-copy">
-              <span className="config-label">{t.labelType} + Label Setting at Print Time</span>
+              <span className="config-label">{t.labelType}</span>
               <strong>{labelMode === "pc"? t.pcLabel : t.weightLabel} - {activeTab.toUpperCase()}</strong>
-              <small>Width, Height resize + Portrait/Landscape + Margin - Preview karke print karo</small>
             </div>
             <div className="flex gap-2 flex-wrap items-center">
               <div className="flex gap-1 items-center"><label className="text-[10px] font-bold">W mm</label><Input type="number" value={printSetting.width} onChange={(e) => setPrintSetting((s) => ({...s, width: Number(e.target.value) }))} className="w-16 h-8 text-xs" /></div>
               <div className="flex gap-1 items-center"><label className="text-[10px] font-bold">H mm</label><Input type="number" value={printSetting.height} onChange={(e) => setPrintSetting((s) => ({...s, height: Number(e.target.value) }))} className="w-16 h-8 text-xs" /></div>
               <div className="flex gap-1 items-center"><label className="text-[10px] font-bold">Margin</label><Input type="number" step={0.5} value={printSetting.margin} onChange={(e) => setPrintSetting((s) => ({...s, margin: Number(e.target.value) }))} className="w-14 h-8 text-xs" /></div>
               <select value={printSetting.orientation} onChange={(e) => setPrintSetting((s) => ({...s, orientation: e.target.value as any }))} className="border rounded h-8 px-2 text-xs">
-                <option value="portrait">Portrait Vertical 54x37</option>
-                <option value="landscape">Landscape Horizontal 37x54</option>
+                <option value="portrait">Portrait 54x37</option>
+                <option value="landscape">Landscape 37x54</option>
               </select>
-              <Button size="sm" variant="outline" onClick={() => setShowPreview(true)}><Eye size={14} /> Preview Verify</Button>
-              <Button size="sm" className="bg-green-600 text-white" onClick={() => printThermalFromDesigner()}><Printer size={14} /> Thermal Print {printSetting.width}x{printSetting.height} {printSetting.orientation}</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowPreview(true)}><Eye size={14} /> Preview</Button>
+              <Button size="sm" className="bg-green-600 text-white" onClick={() => printThermalFromDesigner()}><Printer size={14} /> Print {printSetting.width}x{printSetting.height}</Button>
             </div>
             <div className="label-mode-toggle" role="group" aria-label={t.labelType}>
               <button className={labelMode === "pc"? "label-mode-button label-mode-button--active" : "label-mode-button"} onClick={() => setLabelMode("pc")}><Barcode size={16} />{t.pcLabel}</button>
               <button className={labelMode === "weight"? "label-mode-button label-mode-button--active" : "label-mode-button"} onClick={() => setLabelMode("weight")}><Scale size={16} />{t.weightLabel}</button>
             </div>
-            <div className="mapped-fields">
-              <span>{t.mappedFields} - {activeTab}</span>
-              {mappedFields.slice(0, 10).map((field) => (<Badge key={field} variant="outline">{field}</Badge>))}
-            </div>
             <div className="flex gap-2 items-center flex-wrap">
-              <div className="relative"><Search size={12} className="absolute left-2 top-2.5 text-gray-400" /><Input placeholder="Search PLU / Name / Barcode" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-48 text-xs pl-6" /></div>
+              <div className="relative"><Search size={12} className="absolute left-2 top-2.5 text-gray-400" /><Input placeholder="Search Name / Barcode" value={search} onChange={(e) => setSearch(e.target.value)} className="h-8 w-48 text-xs pl-6" /></div>
               {activeTab === "store" && (<select value={selectedType} onChange={(e) => setSelectedType(e.target.value as any)} className="border rounded h-8 px-2 text-xs"><option value="all">All</option><option value="1">PC Link1</option><option value="2">WT Link2</option></select>)}
               <Badge variant="outline">{filteredProducts.length} filtered</Badge>
-              <Badge className="bg-blue-600 text-white">Total Prints: {filteredProducts.reduce((a, b) => a + (b.copies || 1) * (b.qty || 1), 0)} (QTY=Print)</Badge>
             </div>
           </div>
 
@@ -914,9 +868,9 @@ export default function Home() {
             <div className="workspace-topline">
               <div className="workspace-title">
                 <div className="workspace-icon"><LayoutGrid size={16} /></div>
-                <div><h3>{t.preview} - {activeTab.toUpperCase()} - {filteredProducts.length} items</h3><p><span className="status-dot" />{uniqueCount} {t.rowsReady} · {labelCount} {t.labels.toLowerCase()} · {printSetting.width}x{printSetting.height}mm {printSetting.orientation}</p></div>
+                <div><h3>{t.preview} - {activeTab.toUpperCase()} - {filteredProducts.length} items</h3><p><span className="status-dot" />{uniqueCount} {t.rowsReady} · {labelCount} {t.labels.toLowerCase()} · {printSetting.width}x{printSetting.height}mm</p></div>
               </div>
-              <div className="workspace-menu"><Badge className="badge-soft"><Sparkles size={13} /> QTY = Print Count</Badge><button className="icon-button" aria-label="More options"><MoreHorizontal size={20} /></button></div>
+              <div className="workspace-menu"><Badge className="badge-soft"><Sparkles size={13} /> Code-128 Thermal</Badge><button className="icon-button" aria-label="More options"><MoreHorizontal size={20} /></button></div>
             </div>
             <Separator />
             {filteredProducts.length? (
@@ -928,7 +882,7 @@ export default function Home() {
                       <tr key={product.id}>
                         <td><input type="checkbox" checked={selectedIds.has(product.id)} onChange={(e) => { const s = new Set(selectedIds); if(e.target.checked) s.add(product.id); else s.delete(product.id); setSelectedIds(s); }} /></td>
                         <td><Badge variant="outline" className="bg-green-100">{product.qty} Prints</Badge></td>
-                        <td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" /><span className="subtle-label">Pack: {(product as any).packSize || "1 PCS"} · PLU {product.plu || "-"} · {product.packedDate}→{product.useByDate}</span></div></div></td>
+                        <td><div className="product-cell"><span className="row-number">{String(index + 1).padStart(2, "0")}</span><div><Input value={product.name} onChange={(event) => updateProduct(product.id, "name", event.target.value)} className="table-input table-input--name" /><span className="subtle-label">Pack: {(product as any).packSize || "1 PCS"} · {product.packedDate}→{product.useByDate}</span></div></div></td>
                         <td><div className="barcode-cell"><BarcodeMark value={product.code} compact /><Input value={product.code} onChange={(event) => updateProduct(product.id, "code", event.target.value)} className="table-input table-input--code" /></div></td>
                         <td><Input value={(product as any).packSize || "1 PCS"} onChange={(event) => updateProduct(product.id, "packSize" as any, event.target.value)} className="table-input table-input--price w-20" /></td>
                         <td><div className="copy-stepper"><button onClick={() => updateProduct(product.id, "copies", Math.max(1, product.copies - 1))}><Minus size={14} /></button><span>{product.copies}</span><button onClick={() => updateProduct(product.id, "copies", Math.min(20, product.copies + 1))}><Plus size={14} /></button></div></td>
@@ -940,12 +894,12 @@ export default function Home() {
                 </table>
               </div>
             ) : (
-              <div className="empty-state"><div className="empty-state__icon"><Barcode size={26} /></div><h3>{t.emptyTitle} - {activeTab.toUpperCase()}</h3><p>NEW: QTY=Kitne Print, PACK SIZE=Kitne PC/GRM, ITEM NAME, BARCODE, Production Date, Expiry Date</p></div>
+              <div className="empty-state"><div className="empty-state__icon"><Barcode size={26} /></div><h3>{t.emptyTitle} - {activeTab.toUpperCase()}</h3><p>{t.emptyBody}</p></div>
             )}
             <div className="workspace-footer">
               <div className="footer-stats"><div><span className="stat-number">{uniqueCount}</span><span className="stat-label">{t.products}</span></div><div><span className="stat-number">{labelCount}</span><span className="stat-label">{t.labels}</span></div><div><span className="stat-number">{printSetting.width}x{printSetting.height}</span><span className="stat-label">{printSetting.orientation}</span></div></div>
               <div className="workspace-actions">
-                <Button className="button button--outline" onClick={() => setShowPreview(true)} disabled={!products.length}><Eye size={16} /> Preview Verify</Button>
+                <Button className="button button--outline" onClick={() => setShowPreview(true)} disabled={!products.length}><Eye size={16} /> Preview</Button>
                 <Button className="button button--outline" onClick={() => printThermalFromDesigner()} disabled={!products.length}><Printer size={16} /> Thermal {printSetting.width}x{printSetting.height}</Button>
                 <Button className="button button--outline" onClick={() => generatePDF(false)} disabled={!products.length}><Printer size={16} />{t.generate} A4</Button>
                 <Button className="button button--outline button--coral" onClick={exportPLU} disabled={!products.length}><Download size={16} />{t.export}</Button>
@@ -953,6 +907,7 @@ export default function Home() {
               </div>
             </div>
           </div>
+          <div className="studio-caption"><ShieldCheck size={15} /><span>Your files stay in your browser. Nothing is uploaded to a server.</span></div>
         </section>
 
         <LabelDesigner products={products} />
@@ -967,12 +922,12 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center p-3" onClick={() => setShowPreview(false)}>
           <div className="bg-white rounded-xl p-4 w-full max-w-[540px]" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-3">
-              <b className="text-[11px]">PREVIEW - QTY={filteredProducts[previewIdx].qty} Prints, PACK={(filteredProducts[previewIdx] as any).packSize}</b>
+              <b className="text-[11px]">PREVIEW - {filteredProducts[previewIdx].qty} Prints x {(filteredProducts[previewIdx] as any).packSize}</b>
               <Button size="sm" variant="outline" onClick={() => setShowPreview(false)}>X</Button>
             </div>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-2 mb-3 flex gap-3 flex-wrap">
-              <label className="flex items-center gap-1 text-[11px] cursor-pointer font-bold"><input type="radio" name="scope" checked={printScope==="single"} onChange={() => setPrintScope("single")} /><span>Single Only</span></label>
-              <label className="flex items-center gap-1 text-[11px] cursor-pointer"><input type="radio" name="scope" checked={printScope==="all"} onChange={() => setPrintScope("all")} /><span>All {filteredProducts.length} Items</span></label>
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer font-bold"><input type="radio" name="scope" checked={printScope==="single"} onChange={() => setPrintScope("single")} /><span>Single</span></label>
+              <label className="flex items-center gap-1 text-[11px] cursor-pointer"><input type="radio" name="scope" checked={printScope==="all"} onChange={() => setPrintScope("all")} /><span>All {filteredProducts.length}</span></label>
               <label className="flex items-center gap-1 text-[11px] cursor-pointer"><input type="radio" name="scope" checked={printScope==="selected"} onChange={() => setPrintScope("selected")} /><span>Selected ({selectedIds.size})</span></label>
             </div>
             <div className="bg-gray-200 p-6 rounded flex justify-center items-center">
@@ -988,14 +943,14 @@ export default function Home() {
             </div>
             <div className="flex gap-2 mt-3">
               <Button className="flex-1 bg-green-600 text-white h-10" onClick={() => { setShowPreview(false); setTimeout(() => printThermalFromDesigner(), 200); }}><Printer size={14} /> Print {printScope.toUpperCase()}</Button>
-              <Button variant="outline" className="flex-1 h-10" onClick={() => setShowPreview(false)}>Edit Karo</Button>
+              <Button variant="outline" className="flex-1 h-10" onClick={() => setShowPreview(false)}>Close</Button>
             </div>
           </div>
         </div>
       )}
 
       <footer className="footer">
-        <div className="footer-inner"><Logo /><span>{t.footer}</span><span className="developer-credit">Developed by <strong>Aditya Softwares</strong> - QTY=Print Count, PACK SIZE=Label</span><div className="footer-links"><button onClick={() => toast.info("Dukaan Barcode Studio keeps your data local in this browser.")}>{t.navHelp}</button><button onClick={() => scrollTo("studio")}>Free forever</button></div></div>
+        <div className="footer-inner"><Logo /><span>{t.footer}</span><span className="developer-credit">Developed by <strong>Aditya Softwares</strong></span><div className="footer-links"><button onClick={() => toast.info("Dukaan Barcode Studio keeps your data local in this browser.")}>{t.navHelp}</button><button onClick={() => scrollTo("studio")}>Free forever</button></div></div>
       </footer>
     </div>
   );
