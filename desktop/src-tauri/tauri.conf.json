@@ -1,0 +1,7 @@
+{
+  "productName": "Dukaan Barcode Studio",
+  "identifier": "com.adityasoftwares.dukaanbarcodestudio",
+  "build": { "beforeDevCommand": "", "beforeBuildCommand": "", "frontendDist": "../dist" },
+  "bundle": { "active": true, "icon": ["icon.png"], "resources": [], "category": "Business" },
+  "app": { "windows": [{ "label": "main", "title": "Dukaan Barcode Studio - by Aditya Softwares", "width": 1280, "height": 800 }] }
+}
