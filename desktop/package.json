@@ -1,0 +1,10 @@
+{
+  "name": "dukaan-barcode-studio",
+  "productName": "Dukaan Barcode Studio",
+  "version": "1.0.0",
+  "description": "Dukaan Barcode Studio - Developed by Aditya Softwares",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "author": "Aditya Softwares"
+}
