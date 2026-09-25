@@ -596,15 +596,47 @@ export default function Home() {
         }
         if (!v && el.type!== "barcode") continue;
 
-        if (el.type === "barcode") {
+                       if (el.type === "barcode") {
           try {
             const canvas = document.createElement("canvas");
-            JsBarcode(canvas, p.code, { format: "CODE128", width: 1.3, height: 45, displayValue: true, fontSize: 8, margin: 0, textMargin: 1 });
-            pdf.addImage(canvas.toDataURL("image/png"), "PNG", el.x, el.y, el.width, el.height);
-          } catch {}
+            const scale = 4;
+            const baseW = 800;
+            const baseH = 180;
+            canvas.width = baseW * scale;
+            canvas.height = baseH * scale;
+            const ctx = canvas.getContext("2d") as any;
+            ctx.scale(scale, scale);
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, baseW, baseH);
+
+            // Barcode bina number ke - sirf lines
+            JsBarcode(canvas, p.code, {
+              format: "CODE128",
+              width: 4.8,
+              height: 120,
+              displayValue: false,
+              margin: 0,
+              lineColor: "#000000",
+              background: "#ffffff"
+            });
+
+            // Barcode lines ko 75% height me dalo
+            const barcodeH = el.height * 0.65;
+            pdf.addImage(canvas.toDataURL("image/png", 1.0), "PNG", el.x, el.y, el.width, barcodeH);
+
+            // Number 144086 alag se bada, bold, clear
+            pdf.setFont("helvetica", "bold");
+            pdf.setFontSize(13); // BADA - pehle 8 tha
+            pdf.setTextColor("#000000");
+            const centerX = el.x + el.width / 2;
+            const textY = el.y + barcodeH + 3.5;
+            pdf.text(String(p.code), centerX, textY, { align: "center" });
+
+          } catch (e) { console.error(e); }
         } else {
           pdf.setFont("helvetica", el.bold? "bold" : "normal");
-          pdf.setFontSize(Math.min(el.fontSize * 0.75, 10));
+                    pdf.setFontSize(Math.max(el.fontSize * 1.15, 12));
+          pdf.setFont("helvetica", "bold");
           pdf.setTextColor(el.color || "#000000");
           let align: any = el.align || "left";
           let x = el.x;
