@@ -543,7 +543,7 @@ export default function Home() {
     toast.success("Essae PLU CSV exported");
   };
 
-  const printThermalFromDesigner = async (template?: LabelTemplate) => {
+    const printThermalFromDesigner = async (template?: LabelTemplate) => {
     if (!filteredProducts.length) {
       toast.error("Upload Excel first");
       return;
@@ -560,10 +560,6 @@ export default function Home() {
       return;
     }
 
-    // Tumhara roll 54x37 gap wala - isko lock kiya hai
-    const pw = 54;
-    const ph = 37;
-
     const iframe = document.createElement("iframe");
     iframe.style.cssText = "position:fixed;left:-99999px;top:-99999px;width:0;height:0;border:0";
     document.body.appendChild(iframe);
@@ -573,12 +569,13 @@ export default function Home() {
     const items = filteredProducts.flatMap((p) => Array.from({ length: (p.copies || 1) * (activeTab === "production"? p.qty || 1 : 1) }, () => p));
 
     let html = "";
-    html += "<html><head><meta charset='utf-8'><style>";
-    html += "@page{size:54mm 37mm;margin:0!important}";
-    html += "html,body{width:54mm;margin:0!important;padding:0!important;background:white}";
-    html += "*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial;-webkit-print-color-adjust:exact;print-color-adjust:exact}";
-    html += ".label{width:54mm;height:37mm;position:relative;page-break-after:always;overflow:hidden;background:white;border:0}";
-    html += ".label:last-child{page-break-after:auto}.el{position:absolute;overflow:hidden;line-height:1.1;white-space:nowrap;font-family:Arial}";
+    html += "<html><head><meta charset='utf-8'><title>Label</title><style>";
+    html += " @page{ size:54mm 37mm; margin:0mm!important; }";
+    html += " html,body{ width:54mm; height:37mm; margin:0!important; padding:0!important; background:white; overflow:hidden; }";
+    html += " *{ margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }";
+    html += ".label{ width:54mm; height:37mm; margin:0!important; padding:0!important; position:relative; overflow:hidden; background:white; page-break-after:always; display:block; }";
+    html += ".label:last-child{ page-break-after:avoid; }";
+    html += ".el{ position:absolute; overflow:hidden; line-height:1.1; white-space:nowrap; font-family:Arial; }";
     html += "</style></head><body>";
 
     items.forEach(function (p) {
@@ -608,7 +605,7 @@ export default function Home() {
     });
 
     html += '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></scr' + 'ipt>';
-    html += "<script>setTimeout(function(){document.querySelectorAll('.bc').forEach(function(s){try{JsBarcode(s,s.dataset.code,{format:'CODE128',displayValue:true,margin:0,width:1.4,height:22,fontSize:9,textMargin:1});}catch(e){}});setTimeout(function(){window.focus();window.print();},600)},500);</scr" + "ipt>";
+    html += "<script>setTimeout(function(){document.querySelectorAll('.bc').forEach(function(s){try{JsBarcode(s,s.dataset.code,{format:'CODE128',displayValue:true,margin:0,width:1.4,height:22,fontSize:9,textMargin:1});}catch(e){}}); setTimeout(function(){window.focus(); window.print();}, 800)},500);</scr" + "ipt>";
     html += "</body></html>";
 
     doc.open(); doc.write(html); doc.close();
