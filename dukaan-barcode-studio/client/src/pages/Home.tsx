@@ -851,7 +851,7 @@ export default function Home() {
                 <option value="landscape">Landscape 37x54</option>
               </select>
               <Button size="sm" variant="outline" onClick={() => setShowPreview(true)}><Eye size={14} /> Preview</Button>
-              <Button size="sm" className="bg-green-600 text-white" onClick={() => printThermalFromDesigner()}><Printer size={14} /> Print {printSetting.width}x{printSetting.height}</Button>
+              <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => printThermalFromDesigner()}><Printer size={14} /> Print {printSetting.width}x{printSetting.height}</Button>
             </div>
             <div className="label-mode-toggle" role="group" aria-label={t.labelType}>
               <button className={labelMode === "pc"? "label-mode-button label-mode-button--active" : "label-mode-button"} onClick={() => setLabelMode("pc")}><Barcode size={16} />{t.pcLabel}</button>
@@ -942,7 +942,7 @@ export default function Home() {
               </div>
             </div>
             <div className="flex gap-2 mt-3">
-              <Button className="flex-1 bg-green-600 text-white h-10" onClick={() => { setShowPreview(false); setTimeout(() => printThermalFromDesigner(), 200); }}><Printer size={14} /> Print {printScope.toUpperCase()}</Button>
+              <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white h-10" onClick={() => { setShowPreview(false); setTimeout(() => printThermalFromDesigner(), 200); }}><Printer size={14} /> Print {printScope.toUpperCase()}</Button>
               <Button variant="outline" className="flex-1 h-10" onClick={() => setShowPreview(false)}>Close</Button>
             </div>
           </div>
