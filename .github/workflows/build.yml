@@ -1,0 +1,29 @@
+name: Build EXE
+
+on:
+  push:
+    branches: [desktop-app]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install deps
+        run: npm install
+        working-directory: ./desktop
+      - name: Build EXE
+        uses: tauri-apps/tauri-action@v0
+        with:
+          projectPath: ./desktop
+      - name: Upload EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Dukaan-Barcode-Studio
+          path: desktop/src-tauri/target/release/bundle/
