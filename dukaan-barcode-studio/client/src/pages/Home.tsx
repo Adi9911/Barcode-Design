@@ -441,14 +441,18 @@ export default function Home() {
             const qty = get(obj, ["qty", "quantity"]);
             const prod = get(obj, ["production date", "packed date"]);
             const exp = get(obj, ["expiry date", "usebydate"]);
-            const parseDate = (d: any) => {
+                        const parseDate = (d: any) => {
+              if (!d) return new Date().toLocaleDateString("en-GB");
+              if (typeof d === 'number') {
+                const date = new Date((d - 25569) * 86400 * 1000);
+                if (!isNaN(date.getTime())) return date.toLocaleDateString("en-GB");
+              }
+              if (typeof d === 'string' && d.includes('/')) return d.split(" ")[0];
               try {
                 const dt = new Date(d);
-                if (isNaN(dt.getTime())) return String(d).split(" ")[0];
-                return dt.toLocaleDateString("en-GB");
-              } catch {
-                return String(d).split(" ")[0];
-              }
+                if (!isNaN(dt.getTime()) && dt.getFullYear() > 1971) return dt.toLocaleDateString("en-GB");
+                return String(d).split(" ")[0] || new Date().toLocaleDateString("en-GB");
+              } catch { return new Date().toLocaleDateString("en-GB"); }
             };
             return {
               id: Date.now() + index + 10000,
@@ -539,7 +543,6 @@ export default function Home() {
     toast.success("Essae PLU CSV exported");
   };
 
-  // ==================== THERMAL PRINT - ACTUAL SIZE FIX - NO A4 BIG PAGE ====================
   const printThermalFromDesigner = async (template?: LabelTemplate) => {
     if (!filteredProducts.length) {
       toast.error("Upload Excel first");
@@ -556,32 +559,37 @@ export default function Home() {
       toast.error("My Labels me label select karo");
       return;
     }
-    const isLand = printSetting.orientation === "landscape";
-    const pw = isLand? printSetting.height : printSetting.width;
-    const ph = isLand? printSetting.width : printSetting.height;
+
+    // Tumhara roll 54x37 gap wala - isko lock kiya hai
+    const pw = 54;
+    const ph = 37;
+
     const iframe = document.createElement("iframe");
     iframe.style.cssText = "position:fixed;left:-99999px;top:-99999px;width:0;height:0;border:0";
     document.body.appendChild(iframe);
     const doc = iframe.contentWindow?.document;
     if (!doc) return;
+
     const items = filteredProducts.flatMap((p) => Array.from({ length: (p.copies || 1) * (activeTab === "production"? p.qty || 1 : 1) }, () => p));
+
     let html = "";
     html += "<html><head><meta charset='utf-8'><style>";
-    html += "@page{size:" + pw + "mm " + ph + "mm;margin:" + printSetting.margin + "mm!important}";
-    html += "html,body{width:" + pw + "mm;height:" + ph + "mm;margin:0!important;padding:0!important;overflow:hidden}";
+    html += "@page{size:54mm 37mm;margin:0!important}";
+    html += "html,body{width:54mm;margin:0!important;padding:0!important;background:white}";
     html += "*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial;-webkit-print-color-adjust:exact;print-color-adjust:exact}";
-    html += ".label{width:" + pw + "mm;height:" + ph + "mm;position:relative;page-break-after:always;overflow:hidden;background:white}";
-    html += ".label:last-child{page-break-after:auto}.el{position:absolute;overflow:hidden;line-height:1.1;white-space:nowrap}";
+    html += ".label{width:54mm;height:37mm;position:relative;page-break-after:always;overflow:hidden;background:white;border:0}";
+    html += ".label:last-child{page-break-after:auto}.el{position:absolute;overflow:hidden;line-height:1.1;white-space:nowrap;font-family:Arial}";
     html += "</style></head><body>";
+
     items.forEach(function (p) {
       html += '<div class="label">';
-      tmpl.elements.forEach(function (el) {
+      tmpl.elements.forEach(function (el:any) {
         const k = (el.dataSource || el.field || "").toLowerCase();
         let v = "";
         if (el.type === "static") v = el.text || "";
         else {
           if (activeTab === "store") {
-            const map: any = { name: p.name, code: p.code, plu: p.plu, price: Math.round(p.price).toString(), unitprice: Math.round(p.unitPrice || p.price).toString(), totalprice: Math.round(p.totalPrice || p.price).toString(), packeddate: p.packedDate, usebydate: p.useByDate, expiry: p.expiryDays + " Days", uom: p.unit, qty: String(p.qty || 1) };
+            const map: any = { name: p.name, code: p.code, plu: p.plu, price: Math.round(p.price).toString(), unitprice: Math.round(p.unitPrice || p.price).toString(), totalprice: Math.round(p.totalPrice || p.price).toString(), packeddate: p.packedDate, usebydate: p.useByDate, expiry: (p.expiryDays || 3) + " Days", uom: p.unit, qty: String(p.qty || 1) };
             v = map[k] || "";
             if (k.indexOf("price") >= 0 && v) v = "CDF " + v;
           } else {
@@ -591,21 +599,21 @@ export default function Home() {
           if (el.displayFormat) v = el.displayFormat.replace("{{value}}", v);
         }
         if (el.type === "barcode") {
-          html += '<div class="el" style="left:' + el.x + 'mm;top:' + el.y + 'mm;width:' + el.width + 'mm;height:' + el.height + 'mm;display:flex;align-items:center;justify-content:center"><svg class="bc" data-code="' + p.code + '" style="width:100%;height:100%"></svg></div>';
+          html += '<div class="el" style="left:' + el.x + 'mm;top:' + el.y + 'mm;width:' + el.width + 'mm;height:' + el.height + 'mm;display:flex;align-items:center;justify-content:center;background:white"><svg class="bc" data-code="' + p.code + '" style="width:100%;height:100%"></svg></div>';
         } else {
-          html += '<div class="el" style="left:' + el.x + 'mm;top:' + el.y + 'mm;width:' + el.width + 'mm;height:' + el.height + 'mm;font-size:' + el.fontSize + 'pt;font-weight:' + (el.bold? 700 : 400) + ';color:' + el.color + ';text-align:' + el.align + ';display:flex;align-items:center;' + (el.align==='center'? 'justify-content:center': el.align==='right'? 'justify-content:flex-end':'justify-content:flex-start') + '">' + v + '</div>';
+          html += '<div class="el" style="left:' + el.x + 'mm;top:' + el.y + 'mm;width:' + el.width + 'mm;height:' + el.height + 'mm;font-size:' + el.fontSize + 'pt;font-weight:' + (el.bold? 700 : 400) + ';color:' + el.color + ';text-align:' + el.align + ';display:flex;align-items:center;' + (el.align==='center'?'justify-content:center':el.align==='right'?'justify-content:flex-end':'justify-content:flex-start') + '">' + v + '</div>';
         }
       });
       html += "</div>";
     });
+
     html += '<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></scr' + 'ipt>';
-    html += "<script>setTimeout(function(){document.querySelectorAll('.bc').forEach(function(s){try{JsBarcode(s,s.dataset.code,{format:'CODE128',displayValue:false,margin:0,width:2,height:55});}catch{}});setTimeout(function(){window.focus();window.print();},500)},400);</scr" + "ipt>";
+    html += "<script>setTimeout(function(){document.querySelectorAll('.bc').forEach(function(s){try{JsBarcode(s,s.dataset.code,{format:'CODE128',displayValue:true,margin:0,width:1.4,height:22,fontSize:9,textMargin:1});}catch(e){}});setTimeout(function(){window.focus();window.print();},600)},500);</scr" + "ipt>";
     html += "</body></html>";
-    doc.open();
-    doc.write(html);
-    doc.close();
-    toast.success(activeTab.toUpperCase() + " " + items.length + " labels " + pw + "x" + ph + " actual size");
-    setTimeout(function () { try { document.body.removeChild(iframe); } catch {} }, 10000);
+
+    doc.open(); doc.write(html); doc.close();
+    toast.success(items.length + " labels - 54x37 Gap - Excel se barcode auto");
+    setTimeout(function () { try { document.body.removeChild(iframe); } catch {} }, 15000);
   };
 
   const generatePDF = (mrp = false) => {
@@ -931,10 +939,14 @@ export default function Home() {
                     </div>
                     <div className="text-right">Exp: {filteredProducts[previewIdx].useByDate}</div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 font-bold bg-gray-50 -mx-1.5 px-1.5 py-1 mt-1" style={{ fontSize: "7px" }}>
+                                    <div className="grid grid-cols-3 gap-1 font-bold bg-gray-50 -mx-1.5 px-1.5 py-1 mt-1" style={{ fontSize: "7px" }}>
                     <div>Link: {filteredProducts[previewIdx].labelTemplate} {String(filteredProducts[previewIdx].labelTemplate) === "1"? "PC" : "WT"}</div>
                     <div className="text-center">{filteredProducts[previewIdx].expiryDays} Days</div>
-                    <div className="text-right text-[9px]">CDF {filteredProducts[previewIdx].unitPrice || filteredProducts[previewIdx].price}</div>
+                    {activeTab==="store"? (
+                      <div className="text-right text-[9px]">CDF {filteredProducts[previewIdx].unitPrice || filteredProducts[previewIdx].price}</div>
+                    ) : (
+                      <div className="text-right text-[9px] font-bold">QTY: {filteredProducts[previewIdx].qty} PCS</div>
+                    )}
                   </div>
                 </div>
               </div>
